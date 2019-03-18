@@ -8,3 +8,4 @@ add_project_link_arguments(['-lstdc++'], language : 'cpp')
 llvm = dependency('LLVM')
 
 executable('lilu', 'src/main.cpp', dependencies: [llvm])
+
