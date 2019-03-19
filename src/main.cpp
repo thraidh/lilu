@@ -24,6 +24,12 @@
 
 using namespace llvm;
 
+int add10(int x)
+{
+    std::cout << "called add10(" << x << ")\n";
+    return x+10;
+}
+
 int main()
 {
     std::cout << "Hello, World\n";
@@ -44,13 +50,13 @@ int main()
         cast<Function>(M->getOrInsertFunction("add1", Type::getInt32Ty(Context),
                                               Type::getInt32Ty(Context)));
 
+    BasicBlock *BB = nullptr;
+    //IRBuilder<> builder(BB);
+
+    /*
     // Add a basic block to the function. As before, it automatically inserts
     // because of the last argument.
-    BasicBlock *BB = BasicBlock::Create(Context, "EntryBlock", Add1F);
-
-    // Create a basic block builder with default parameters.  The builder will
-    // automatically append instructions to the basic block `BB'.
-    IRBuilder<> builder(BB);
+    BB = BasicBlock::Create(Context, "EntryBlock", Add1F);
 
     // Get pointers to the constant `1'.
     Value *One = builder.getInt32(1);
@@ -65,6 +71,7 @@ int main()
 
     // Create the return instruction and add it to the basic block
     builder.CreateRet(Add);
+    */
 
     // Now, function add1 is ready.
 
@@ -75,6 +82,7 @@ int main()
 
     // Add a basic block to the FooF function.
     BB = BasicBlock::Create(Context, "EntryBlock", FooF);
+    IRBuilder<> builder(BB);
 
     // Tell the basic block builder to attach itself to the new basic block
     builder.SetInsertPoint(BB);
@@ -91,6 +99,7 @@ int main()
 
     // Now we create the JIT.
     ExecutionEngine *EE = EngineBuilder(std::move(Owner)).create();
+    EE->addGlobalMapping(Add1F, (void*) add10);
 
     outs() << "We just constructed this LLVM module:\n\n"
            << *M;
@@ -100,6 +109,12 @@ int main()
     // Call the `foo' function with no arguments:
     std::vector<GenericValue> noargs;
     GenericValue gv = EE->runFunction(FooF, noargs);
+
+    /*
+    std::vector<GenericValue> Args(1);
+    Args[0].IntVal = APInt(32, n);
+    GenericValue GV = EE->runFunction(FibF, Args);
+    */
 
     // Import result of execution:
     outs() << "Result: " << gv.IntVal << "\n";
