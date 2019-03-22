@@ -30,9 +30,11 @@ int add10(int x)
     return x+10;
 }
 
+int parse();
+
 int main()
 {
-    std::cout << "Hello, World\n";
+    parse();
 
     InitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();

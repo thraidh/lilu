@@ -13,8 +13,10 @@
 
 # Stage 4
 
-- load file
-- implement expression precedence parser and create AST
+- load file [done]
+- implement recursive-descent parser
+- implement expression precedence parser
+- create AST
 
 # Stage 5
 
