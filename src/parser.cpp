@@ -77,6 +77,13 @@ class LexerState
 {
   public:
     char const *ptr;
+    void error(std::string const &desc)
+    {
+        char const *end = ptr;
+        while (*end != '\n' && *end != 0)
+            ++end;
+        std::cout << desc << " at [" << std::string_view(ptr, end - ptr) << "]" << std::endl;
+    }
 };
 
 class GrammarElement
@@ -121,29 +128,42 @@ class Rule
 class Repetition : public GrammarElement
 {
     std::shared_ptr<GrammarElement const> element;
+    int min, max;
 
   public:
-    Repetition(std::shared_ptr<GrammarElement const> ge) : element(ge) {}
+    Repetition(std::shared_ptr<GrammarElement const> ge, int min_, int max_) : element(ge), min(min_), max(max_) {}
     virtual Result const *match(LexerState &ls) const override
     {
+        LexerState save = ls;
         auto result = new MultiResult();
         std::cout << "rep(" << std::endl;
-        while (true)
+        int i = 0;
+        while (i != max)
         {
-            LexerState save = ls;
             Result const *ret = element->match(ls);
             if (!ret)
             {
+                if (i < min)
+                {
+                    ls = save;
+                    ls.error("rep failed (too few)");
+                    return nullptr;
+                }
                 std::cout << "rep)" << std::endl;
-                ls = save;
                 return result;
             }
             result->add(ret);
+            std::cout << "rep+" << std::endl;
+            ++i;
         }
+        std::cout << "rep max)" << std::endl;
+        return result;
     }
 };
 
-std::shared_ptr<GrammarElement const> rep(std::shared_ptr<GrammarElement const> ge) { return std::make_shared<Repetition const>(ge); }
+std::shared_ptr<GrammarElement const> rep(std::shared_ptr<GrammarElement const> ge) { return std::make_shared<Repetition const>(ge, 0, -1); }
+std::shared_ptr<GrammarElement const> rep1(std::shared_ptr<GrammarElement const> ge) { return std::make_shared<Repetition const>(ge, 1, -1); }
+std::shared_ptr<GrammarElement const> opt(std::shared_ptr<GrammarElement const> ge) { return std::make_shared<Repetition const>(ge, 0, 1); }
 
 class Alternation : public GrammarElement
 {
@@ -167,8 +187,9 @@ class Alternation : public GrammarElement
                 return ret;
             }
             ls = save;
+            std::cout << "alt+" << std::endl;
         }
-        std::cout << "alt failed at " << ls.ptr << std::endl;
+        ls.error("alt failed");
         return nullptr;
     }
 };
@@ -216,11 +237,12 @@ class Sequence : public GrammarElement
             auto ret = ge->match(ls);
             if (!ret)
             {
-                std::cout << "seq fail at " << ls.ptr << std::endl;
+                ls.error("seq failed");
                 ls = save;
                 return nullptr;
             }
             result->add(ret);
+            std::cout << "seq+" << std::endl;
         }
         std::cout << "seq)" << std::endl;
         return result;
@@ -278,7 +300,7 @@ class Id : public GrammarElement
             return new TextResult(start, ls.ptr);
         }
         ls = save;
-        std::cout << "expected id at " << ls.ptr << std::endl;
+        ls.error("expected id");
         return nullptr;
     }
 };
@@ -308,7 +330,7 @@ class Text : public GrammarElement
             return new TextResult(start, ls.ptr);
         }
         ls = save;
-        std::cout << "expected text " << t << " at " << ls.ptr << std::endl;
+        ls.error("expected text " + t);
         return nullptr;
     }
 };
@@ -334,6 +356,7 @@ class Number : public GrammarElement
             return new TextResult(start, ls.ptr);
         }
         ls = save;
+        ls.error("expected number");
         return nullptr;
     }
 };
@@ -355,6 +378,7 @@ class Punctuation : public GrammarElement
             return new TextResult(start, ls.ptr);
         }
         ls = save;
+        ls.error("expected punctuation");
         return nullptr;
     }
 };
@@ -375,7 +399,7 @@ int parse()
     lilufile = rep(element);
     element = alt(funcdef, expr);
     expr = seq(id(), punct(), id());
-    args = rep(seq(arg, rep(seq(text(","), arg))));
+    args = opt(seq(arg, rep(seq(text(","), arg))));
     arg = seq(id(), text(":"), id());
     funcdef = seq(text("function"), id(), text("("), args, text(")"), text(":"), id(), text("is"), element, text("end"));
 
