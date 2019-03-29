@@ -1,21 +1,29 @@
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
 
+template <typename T>
+using cps = std::shared_ptr<T const>;
+
+template <typename T>
+using ps = std::shared_ptr<T>;
+
 class Result
 {
   public:
-    virtual void print() const = 0;
+    virtual void print(int indent) const = 0;
+    virtual void addToMap(class MapResult const *map) const {};
     virtual ~Result() {}
 };
 
 class NullResult : public Result
 {
   public:
-    virtual void print() const override {}
+    virtual void print(int indent) const override {}
 };
 
 class TextResult : public Result
@@ -25,24 +33,68 @@ class TextResult : public Result
 
   public:
     TextResult(char const *begin, char const *end) : b(begin), e(end) {}
-    virtual void print() const override
+    virtual void print(int indent) const override
     {
-        std::cout << "Text[" << std::string_view(b, e - b) << "]";
+        std::cout << "Text[" << std::string_view(b, e - b) << "]" << std::endl;
     }
 };
 
-class ExprResult : public Result
+class NamedResult : public Result
 {
+  protected:
     Result const *e;
+    std::string name;
 
   public:
-    ExprResult(Result const *expr) : e(expr) {}
-    virtual void print() const override
+    NamedResult(std::string n, Result const *expr) : e(expr), name(n) {}
+    virtual void print(int indent) const override
     {
-        std::cout << "(";
-        e->print();
+        std::cout << name;
+        std::cout << "=(";
+        e->print(indent + 1);
         std::cout << ")";
     }
+    virtual void addToMap(class MapResult const *map) const override;
+};
+
+class MapResult : public NamedResult
+{
+    mutable std::multimap<std::string, Result const *> map;
+
+  public:
+    MapResult(std::string n, Result const *expr) : NamedResult(n, expr) {}
+    virtual void print(int indent) const override
+    {
+        //std::cout << "map> " << name << std::endl;
+        e->addToMap(this);
+        //std::cout << "<map " << name << std::endl;
+        std::cout << "rule " << name << ":" << std::endl;
+        ++indent;
+        for (auto kv : map)
+        {
+            std::cout << std::string(indent * 2, ' ') << kv.first << "=";
+            kv.second->print(indent);
+        }
+    }
+    virtual void addToMap(MapResult const *map) const override
+    {
+        //std::cout << "map+> " << name << std::endl;
+        map->add(name, this);
+        //std::cout << "<map+ " << name << std::endl;
+    };
+    void add(std::string k, Result const *v) const
+    {
+        //std::cout << "adding " << k << " to " << name << std::endl;
+        map.insert({k, v});
+    }
+};
+
+void NamedResult::addToMap(MapResult const *map) const
+{
+    //std::cout << "named> " << name << std::endl;
+    map->add(name, e);
+    //e->addToMap(map);
+    //std::cout << "<named " << name << std::endl;
 };
 
 class MultiResult : public Result
@@ -50,27 +102,31 @@ class MultiResult : public Result
     std::vector<Result const *> l;
 
   public:
-    virtual void print() const override
+    virtual void print(int indent) const override
     {
-        std::cout << "[";
-        auto i = l.begin();
-        if (i != l.end())
+        std::cout << "[" << std::endl;
+        ++indent;
+        for (auto e : l)
         {
-            (*i)->print();
-            ++i;
-            while (i != l.end())
-            {
-                std::cout << ", ";
-                (*i)->print();
-                ++i;
-            }
+            std::cout << std::string(indent * 2, ' ');
+            e->print(indent);
         }
-        std::cout << "]";
+        --indent;
+        std::cout << std::string(indent * 2, ' ') << "]" << std::endl;
     }
     void add(Result const *r)
     {
         l.push_back(r);
     }
+    virtual void addToMap(MapResult const *map) const override
+    {
+        //std::cout << "multi>" << std::endl;
+        for (auto r : l)
+        {
+            r->addToMap(map);
+        }
+        //std::cout << "<multi" << std::endl;
+    };
 };
 
 class LexerState
@@ -95,12 +151,39 @@ class GrammarElement
 
 class RuleImpl : public GrammarElement
 {
-  public:
-    std::shared_ptr<GrammarElement const> element;
+    std::string name;
 
+  public:
+    cps<GrammarElement> element;
+    RuleImpl(std::string n) : name(n) {}
     virtual Result const *match(LexerState &ls) const override
     {
-        return element->match(ls);
+        auto ret = element->match(ls);
+        if (ret)
+        {
+            std::cout << "store in rule " << name << std::endl;
+            return new MapResult(name, ret);
+        }
+        return ret;
+    }
+};
+
+class Named : public GrammarElement
+{
+    std::string name;
+
+  public:
+    cps<GrammarElement> element;
+    Named(std::string n, cps<GrammarElement> e) : name(n), element(e) {}
+    virtual Result const *match(LexerState &ls) const override
+    {
+        auto ret = element->match(ls);
+        if (ret)
+        {
+            std::cout << "store in " << name << std::endl;
+            return new NamedResult(name, ret);
+        }
+        return ret;
     }
 };
 
@@ -109,7 +192,7 @@ class Rule
     std::shared_ptr<RuleImpl> rule;
 
   public:
-    Rule() : rule(std::make_shared<RuleImpl>()) {}
+    Rule(std::string n) : rule(std::make_shared<RuleImpl>(n)) {}
     operator std::shared_ptr<GrammarElement const>() const
     {
         return rule;
@@ -194,28 +277,18 @@ class Alternation : public GrammarElement
     }
 };
 
-void alt(Alternation *a) {}
-
-template <typename... Args>
-void alt(Alternation *a, std::shared_ptr<GrammarElement const> ge, Args... args)
+ps<Alternation> operator|(ps<Alternation> left, cps<GrammarElement> right)
 {
-    a->add(ge);
-    alt(a, args...);
+    left->add(right);
+    return left;
 }
 
-template <typename... Args>
-void alt(Alternation *a, Rule const &r, Args... args)
+ps<Alternation> operator|(cps<GrammarElement> left, cps<GrammarElement> right)
 {
-    a->add(r);
-    alt(a, args...);
-}
-
-template <typename... Args>
-std::shared_ptr<GrammarElement const> alt(Args... args)
-{
-    Alternation *ret = new Alternation();
-    alt(ret, args...);
-    return std::shared_ptr<GrammarElement const>(ret);
+    ps<Alternation> ret = std::make_shared<Alternation>();
+    ret->add(left);
+    ret->add(right);
+    return ret;
 }
 
 class Sequence : public GrammarElement
@@ -249,28 +322,18 @@ class Sequence : public GrammarElement
     }
 };
 
-void seq(Sequence *a) {}
-
-template <typename... Args>
-void seq(Sequence *a, std::shared_ptr<GrammarElement const> ge, Args... args)
+ps<Sequence> operator+(ps<Sequence> left, cps<GrammarElement> right)
 {
-    a->add(ge);
-    seq(a, args...);
+    left->add(right);
+    return left;
 }
 
-template <typename... Args>
-void seq(Sequence *a, Rule const &r, Args... args)
+ps<Sequence> operator+(cps<GrammarElement> left, cps<GrammarElement> right)
 {
-    a->add(r);
-    seq(a, args...);
-}
-
-template <typename... Args>
-std::shared_ptr<GrammarElement const> seq(Args... args)
-{
-    Sequence *ret = new Sequence();
-    seq(ret, args...);
-    return std::shared_ptr<GrammarElement const>(ret);
+    ps<Sequence> ret = std::make_shared<Sequence>();
+    ret->add(left);
+    ret->add(right);
+    return ret;
 }
 
 void skip_space(LexerState &ls)
@@ -337,6 +400,56 @@ class Text : public GrammarElement
 
 std::shared_ptr<GrammarElement const> text(std::string text) { return std::shared_ptr<GrammarElement const>(new Text(text)); }
 
+ps<Sequence> operator+(ps<Sequence> left, std::string right)
+{
+    left->add(text(right));
+    return left;
+}
+
+ps<Sequence> operator+(cps<GrammarElement> left, std::string right)
+{
+    ps<Sequence> ret = std::make_shared<Sequence>();
+    ret->add(left);
+    ret->add(text(right));
+    return ret;
+}
+
+cps<Named> operator/(cps<GrammarElement> left, std::string right)
+{
+    cps<Named> ret = std::make_shared<Named>(right, left);
+    return ret;
+}
+
+ps<Sequence> operator+(std::string left, cps<GrammarElement> right)
+{
+    ps<Sequence> ret = std::make_shared<Sequence>();
+    ret->add(text(left));
+    ret->add(right);
+    return ret;
+}
+
+ps<Alternation> operator|(ps<Alternation> left, std::string right)
+{
+    left->add(text(right));
+    return left;
+}
+
+ps<Alternation> operator|(cps<GrammarElement> left, std::string right)
+{
+    ps<Alternation> ret = std::make_shared<Alternation>();
+    ret->add(left);
+    ret->add(text(right));
+    return ret;
+}
+
+ps<Alternation> operator|(std::string left, cps<GrammarElement> right)
+{
+    ps<Alternation> ret = std::make_shared<Alternation>();
+    ret->add(text(left));
+    ret->add(right);
+    return ret;
+}
+
 class Number : public GrammarElement
 {
   public:
@@ -394,14 +507,14 @@ end
 
 int parse()
 {
-    Rule lilufile, element, funcdef, expr, args, arg;
+    Rule lilufile("lilufile"), element("element"), funcdef("funcdef"), expr("expr"), args("args"), arg("arg");
 
     lilufile = rep(element);
-    element = alt(funcdef, expr);
-    expr = seq(id(), punct(), id());
-    args = opt(seq(arg, rep(seq(text(","), arg))));
-    arg = seq(id(), text(":"), id());
-    funcdef = seq(text("function"), id(), text("("), args, text(")"), text(":"), id(), text("is"), element, text("end"));
+    element = funcdef | expr;
+    expr = (id() + punct() + id()) / "e";
+    args = opt(arg + rep("," + arg));
+    arg = id() / "name" + text(":") + id() / "type";
+    funcdef = "function" + id() / "name" + "(" + args + ")" + ":" + id() / "rtype" + "is" + element / "body" + "end";
 
     std::ifstream file("first.lilu");
 
@@ -416,7 +529,7 @@ int parse()
         auto res = lilufile.match(ls);
         if (res != nullptr)
         {
-            res->print();
+            res->print(0);
             std::cout << std::endl;
         }
         std::cout << "rest: " << ls.ptr << std::endl;
