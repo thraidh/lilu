@@ -1,8 +1,10 @@
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <sstream>
+#include <stack>
 #include <string>
 #include <vector>
 
@@ -70,10 +72,18 @@ class MapResult : public NamedResult
         //std::cout << "<map " << name << std::endl;
         std::cout << "rule " << name << ":" << std::endl;
         ++indent;
-        for (auto kv : map)
+        if (map.empty())
         {
-            std::cout << std::string(indent * 2, ' ') << kv.first << "=";
-            kv.second->print(indent);
+            std::cout << std::string(indent * 2, ' ');
+            e->print(indent);
+        }
+        else
+        {
+            for (auto kv : map)
+            {
+                std::cout << std::string(indent * 2, ' ') << kv.first << "=";
+                kv.second->print(indent);
+            }
         }
     }
     virtual void addToMap(MapResult const *map) const override
@@ -498,6 +508,199 @@ class Punctuation : public GrammarElement
 
 std::shared_ptr<GrammarElement const> punct() { return std::shared_ptr<GrammarElement const>(new Punctuation()); }
 
+template <typename V>
+std::string extractKeyFrom(V const *v);
+
+template <typename V>
+class ResultMap : public GrammarElement
+{
+    int maxlen;
+    std::map<std::string, V const *> resmap;
+
+  public:
+    virtual V const *match(LexerState &ls) const override
+    {
+        LexerState save = ls;
+        skip_space(ls);
+        char const *start = ls.ptr;
+        while (*ls.ptr && ls.ptr - start < maxlen)
+        {
+            ++ls.ptr;
+        }
+        while (ls.ptr > start)
+        {
+            auto f = resmap.find(std::string(start, ls.ptr - start));
+            if (f != resmap.end())
+            {
+                std::cout << "matched resmap value " << f->first << std::endl;
+                return f->second;
+            }
+            --ls.ptr;
+        }
+        ls = save;
+        ls.error("expected value from resmap");
+        return nullptr;
+    }
+
+    ResultMap *add(V const *v)
+    {
+        std::string k = extractKeyFrom(v);
+        int len = k.length();
+        if (len > maxlen)
+        {
+            maxlen = len;
+        }
+        resmap.insert({k, v});
+        return this;
+    }
+};
+
+template <typename V>
+std::shared_ptr<ResultMap<V>> resmap() { return std::shared_ptr<ResultMap<V>>(new ResultMap<V>()); }
+
+class Expr : public Result
+{
+    std::string op;
+    std::vector<Result const *> args;
+
+  public:
+    Expr(std::string o) : op(o) {}
+    Expr *add(Result const *e)
+    {
+        args.push_back(e);
+        return this;
+    }
+
+    virtual void print(int indent) const override
+    {
+        std::cout << "expr " << op << ":" << std::endl;
+        ++indent;
+        for (auto arg : args)
+        {
+            std::cout << std::string(indent * 2, ' ');
+            arg->print(indent);
+        }
+    }
+};
+
+template <typename C>
+typename C::value_type pop(C &container)
+{
+    typename C::value_type ret = container.back();
+    container.pop_back();
+    return ret;
+}
+
+class Operator : public Result
+{
+  public:
+    int prec;
+    std::string name;
+
+    Operator(int p, std::string n, int type) : prec(p), name(n) {}
+
+    bool tighterThan(int other_prec) const
+    {
+        std::cout << "is " << name << "(" << prec << ") tighter than " << other_prec << std::endl;
+        return prec <= other_prec;
+    }
+
+    virtual void print(int indent) const override
+    {
+        std::cout << "operator " << name << std::endl;
+    }
+};
+
+std::string extractKeyFrom(Operator const *op)
+{
+    return op->name;
+}
+
+class ExpressionParser : public GrammarElement
+{
+    Operator const *sentinel = new Operator(std::numeric_limits<int>::max(), "sentinel", -1);
+
+    struct Data
+    {
+        std::vector<Result const *> exprs;
+        std::vector<Operator const *> ops;
+
+        void resolveStack(int prec)
+        {
+            std::cout << "resolveStack " << prec << std::endl;
+            while (ops.back()->tighterThan(prec))
+            {
+                auto op = ::pop(ops);
+                auto rhs = pop();
+                auto lhs = pop();
+                auto ex = new Expr(op->name);
+                exprs.push_back(ex->add(lhs)->add(rhs));
+                std::cout << "build expr " << op->name << "(" << lhs << "," << rhs << std::endl;
+            }
+        }
+
+        void push(Result const *ex)
+        {
+            exprs.push_back(ex);
+        }
+
+        void push(Operator const *ex)
+        {
+            ops.push_back(ex);
+        }
+
+        Result const *pop()
+        {
+            return ::pop(exprs);
+        }
+    };
+
+    cps<GrammarElement> primary;
+    cps<ResultMap<Operator>> opmap;
+
+  public:
+    ExpressionParser(cps<GrammarElement> p, cps<ResultMap<Operator>> o) : primary(p), opmap(o) {}
+
+    virtual Result const *match(LexerState &ls) const override
+    {
+        LexerState save = ls;
+
+        Data data;
+        // prec=0 is tightest
+
+        data.ops.push_back(sentinel);
+
+        while (true)
+        {
+            skip_space(ls);
+            Result const *prim = primary->match(ls);
+            if (!prim)
+            {
+                ls = save;
+                ls.error("expected expression");
+                return nullptr;
+            }
+            data.push(prim);
+
+            Operator const *op = opmap->match(ls);
+            if (!op)
+            {
+                data.resolveStack(std::numeric_limits<int>::max() - 1);
+                return data.pop();
+            }
+
+            data.resolveStack(op->prec);
+
+            data.push(op);
+        }
+    }
+
+    virtual ~ExpressionParser()
+    {
+        delete sentinel;
+    }
+};
+
 /*
 function abc(x:int, y:int):int is
     x+y
@@ -507,14 +710,19 @@ end
 
 int parse()
 {
-    Rule lilufile("lilufile"), element("element"), funcdef("funcdef"), expr("expr"), args("args"), arg("arg");
+    Rule lilufile("lilufile"), element("element"), funcdef("funcdef"), expr("expr"), args("args"), arg("arg"), primary("primary");
+
+    ps<ResultMap<Operator>> rmap = resmap<Operator>();
+    cps<ExpressionParser> expa = std::make_shared<ExpressionParser const>(primary, rmap);
+    rmap->add(new Operator(2, "+", 0));
 
     lilufile = rep(element);
     element = funcdef | expr;
-    expr = (id() + punct() + id()) / "e";
+    expr = expa;
     args = opt(arg + rep("," + arg));
     arg = id() / "name" + text(":") + id() / "type";
     funcdef = "function" + id() / "name" + "(" + args + ")" + ":" + id() / "rtype" + "is" + element / "body" + "end";
+    primary = id();
 
     std::ifstream file("first.lilu");
 
