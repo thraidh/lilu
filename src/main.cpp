@@ -27,14 +27,21 @@ using namespace llvm;
 int add10(int x)
 {
     std::cout << "called add10(" << x << ")\n";
-    return x+10;
+    return x + 10;
 }
 
 int parse();
+//int handparse();
 
 int main()
 {
     parse();
+
+    std::cout << "######################################" << std::endl;
+
+    //handparse();
+
+    std::cout << "######################################" << std::endl;
 
     InitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();
@@ -101,7 +108,7 @@ int main()
 
     // Now we create the JIT.
     ExecutionEngine *EE = EngineBuilder(std::move(Owner)).create();
-    EE->addGlobalMapping(Add1F, (void*) add10);
+    EE->addGlobalMapping(Add1F, (void *)add10);
 
     outs() << "We just constructed this LLVM module:\n\n"
            << *M;

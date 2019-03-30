@@ -7,5 +7,5 @@ add_project_link_arguments(['-lstdc++'], language : 'cpp')
 
 llvm = dependency('LLVM')
 
-executable('lilu', 'src/main.cpp', 'src/parser.cpp', dependencies: [llvm])
+executable('lilu', 'src/main.cpp', 'src/parser.cpp',  dependencies: [llvm])
 

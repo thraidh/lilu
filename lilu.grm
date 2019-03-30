@@ -1,0 +1,11 @@
+grammar lilu;
+
+lilufile ::= ^ element* $;
+element ::= funcdef | expr ;
+extern expr;
+args ::= [ arg [ "," arg ]* ]?;
+arg ::= name=ID ":" type=ID;
+funcdef ::= "function" name=ID "(" args ")" ":" rtype=ID "is" body=element "end";
+primary ::= ID | NUMBER | "(" expr ")" ;
+
+

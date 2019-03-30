@@ -8,17 +8,44 @@
 #include <string>
 #include <vector>
 
+class MapResult;
+class TextResult;
+
+class visitor
+{
+  public:
+    virtual ~visitor() {}
+    virtual void visit_top(MapResult const *) = 0;
+    virtual void visit_rule(MapResult const *) = 0;
+    virtual void visit_alt(MapResult const *) = 0;
+    virtual void visit_seq(MapResult const *) = 0;
+    virtual void visit_repe(MapResult const *) = 0;
+    virtual void visit_named(MapResult const *) = 0;
+    virtual void visit_element(MapResult const *) = 0;
+    virtual void visit_special(MapResult const *) = 0;
+    virtual void visit_ref(MapResult const *) = 0;
+    virtual void visit_capture(MapResult const *) = 0;
+    virtual void visit_noncapture(MapResult const *) = 0;
+    virtual void visit_txt(MapResult const *) = 0;
+    virtual void visitTextResult(TextResult const *) {}
+};
+
 template <typename T>
 using cps = std::shared_ptr<T const>;
 
 template <typename T>
 using ps = std::shared_ptr<T>;
 
+using VisitCallback = void (visitor::*)(MapResult const *);
+
 class Result
 {
   public:
     virtual void print(int indent) const = 0;
+    virtual void visit(visitor &v) const {};
     virtual void addToMap(class MapResult const *map) const {};
+    virtual std::string_view text() const { return std::string_view(); }
+    virtual std::string str() const { return std::string(text()); }
     virtual ~Result() {}
 };
 
@@ -27,6 +54,8 @@ class NullResult : public Result
   public:
     virtual void print(int indent) const override {}
 };
+
+NullResult const *nullresult = new NullResult();
 
 class TextResult : public Result
 {
@@ -37,7 +66,15 @@ class TextResult : public Result
     TextResult(char const *begin, char const *end) : b(begin), e(end) {}
     virtual void print(int indent) const override
     {
-        std::cout << "Text[" << std::string_view(b, e - b) << "]" << std::endl;
+        std::cout << "Text[" << text() << "]" << std::endl;
+    }
+    virtual void visit(visitor &v) const
+    {
+        v.visitTextResult(this);
+    };
+    virtual std::string_view text() const override
+    {
+        return std::string_view(b, e - b);
     }
 };
 
@@ -62,9 +99,10 @@ class NamedResult : public Result
 class MapResult : public NamedResult
 {
     mutable std::multimap<std::string, Result const *> map;
+    VisitCallback visitcb;
 
   public:
-    MapResult(std::string n, Result const *expr) : NamedResult(n, expr) {}
+    MapResult(std::string n, Result const *expr, VisitCallback cb) : NamedResult(n, expr), visitcb(cb) {}
     virtual void print(int indent) const override
     {
         //std::cout << "map> " << name << std::endl;
@@ -96,6 +134,36 @@ class MapResult : public NamedResult
     {
         //std::cout << "adding " << k << " to " << name << std::endl;
         map.insert({k, v});
+    }
+    Result const *get(std::string const &key) const
+    {
+        auto it = map.find(key);
+        if (it == map.end())
+            return nullresult;
+        return it->second;
+    }
+    virtual void visit(visitor &v) const override
+    {
+        if (visitcb != nullptr)
+        {
+            //std::cout << "visit " << name << std::endl;
+            (v.*visitcb)(this);
+            //std::cout << "leave " << name << std::endl;
+        }
+    };
+    void visitChildren(visitor &v) const
+    {
+        if (map.empty())
+        {
+            e->visit(v);
+        }
+        else
+        {
+            for (auto kv : map)
+            {
+                kv.second->visit(v);
+            }
+        }
     }
 };
 
@@ -159,21 +227,26 @@ class GrammarElement
     virtual ~GrammarElement() {}
 };
 
+class visitor;
+
 class RuleImpl : public GrammarElement
 {
     std::string name;
+    VisitCallback visit;
 
   public:
     cps<GrammarElement> element;
-    RuleImpl(std::string n) : name(n) {}
+    RuleImpl(std::string n, VisitCallback cb) : name(n), visit(cb) {}
     virtual Result const *match(LexerState &ls) const override
     {
+        std::cout << "enter rule " << name << std::endl;
         auto ret = element->match(ls);
         if (ret)
         {
             std::cout << "store in rule " << name << std::endl;
-            return new MapResult(name, ret);
+            return new MapResult(name, ret, visit);
         }
+        std::cout << "fail rule " << name << std::endl;
         return ret;
     }
 };
@@ -197,12 +270,15 @@ class Named : public GrammarElement
     }
 };
 
+class visitor;
+
 class Rule
 {
     std::shared_ptr<RuleImpl> rule;
 
   public:
-    Rule(std::string n) : rule(std::make_shared<RuleImpl>(n)) {}
+    Rule(std::string n) : rule(std::make_shared<RuleImpl>(n, nullptr)) {}
+    Rule(std::string n, VisitCallback cb) : rule(std::make_shared<RuleImpl>(n, cb)) {}
     operator std::shared_ptr<GrammarElement const>() const
     {
         return rule;
@@ -379,6 +455,39 @@ class Id : public GrammarElement
 };
 
 std::shared_ptr<GrammarElement const> id() { return std::shared_ptr<GrammarElement const>(new Id()); }
+
+class StringToken : public GrammarElement
+{
+  public:
+    virtual Result const *match(LexerState &ls) const override
+    {
+        LexerState save = ls;
+        skip_space(ls);
+        char const *start = ls.ptr;
+        if (*ls.ptr == '"')
+        {
+            ls.ptr++;
+            while (*ls.ptr != '"')
+            {
+                if (!*ls.ptr)
+                {
+                    ls = save;
+                    ls.error("unterminated string");
+                    return nullptr;
+                }
+                ls.ptr++;
+            }
+            ls.ptr++;
+            std::cout << "matched string " << std::string_view(start, ls.ptr - start) << std::endl;
+            return new TextResult(start, ls.ptr);
+        }
+        ls = save;
+        ls.error("expected string");
+        return nullptr;
+    }
+};
+
+std::shared_ptr<GrammarElement const> stringtoken() { return std::shared_ptr<GrammarElement const>(new StringToken()); }
 
 class Text : public GrammarElement
 {
@@ -616,10 +725,10 @@ std::string extractKeyFrom(Operator const *op)
     return op->name;
 }
 
+static Operator const *sentinel = new Operator(std::numeric_limits<int>::max(), "  sentinel  ", -1);
+
 class ExpressionParser : public GrammarElement
 {
-    Operator const *sentinel = new Operator(std::numeric_limits<int>::max(), "sentinel", -1);
-
     struct Data
     {
         std::vector<Result const *> exprs;
@@ -635,7 +744,7 @@ class ExpressionParser : public GrammarElement
                 auto lhs = pop();
                 auto ex = new Expr(op->name);
                 exprs.push_back(ex->add(lhs)->add(rhs));
-                std::cout << "build expr " << op->name << "(" << lhs << "," << rhs << std::endl;
+                std::cout << "build expr " << op->name << "(" << lhs << "," << rhs << ")" << std::endl;
             }
         }
 
@@ -708,23 +817,204 @@ end
 
 */
 
+class treewalker : public visitor
+{
+  public:
+    void visit_top(MapResult const *r)
+    {
+        pre_top(r);
+        r->visitChildren(*this);
+        post_top(r);
+    }
+    virtual void pre_top(MapResult const *r) {}
+    virtual void post_top(MapResult const *r) {}
+    void visit_rule(MapResult const *r)
+    {
+        pre_rule(r);
+        r->visitChildren(*this);
+        post_rule(r);
+    }
+    virtual void pre_rule(MapResult const *r) {}
+    virtual void post_rule(MapResult const *r) {}
+    void visit_alt(MapResult const *r)
+    {
+        pre_alt(r);
+        r->visitChildren(*this);
+        post_alt(r);
+    }
+    virtual void pre_alt(MapResult const *r) {}
+    virtual void post_alt(MapResult const *r) {}
+    void visit_seq(MapResult const *r)
+    {
+        pre_seq(r);
+        r->visitChildren(*this);
+        post_seq(r);
+    }
+    virtual void pre_seq(MapResult const *r) {}
+    virtual void post_seq(MapResult const *r) {}
+    void visit_repe(MapResult const *r)
+    {
+        pre_repe(r);
+        r->visitChildren(*this);
+        post_repe(r);
+    }
+    virtual void pre_repe(MapResult const *r) {}
+    virtual void post_repe(MapResult const *r) {}
+    void visit_named(MapResult const *r)
+    {
+        pre_named(r);
+        r->visitChildren(*this);
+        post_named(r);
+    }
+    virtual void pre_named(MapResult const *r) {}
+    virtual void post_named(MapResult const *r) {}
+    void visit_element(MapResult const *r)
+    {
+        pre_element(r);
+        r->visitChildren(*this);
+        post_element(r);
+    }
+    virtual void pre_element(MapResult const *r) {}
+    virtual void post_element(MapResult const *r) {}
+    void visit_special(MapResult const *r)
+    {
+        pre_special(r);
+        r->visitChildren(*this);
+        post_special(r);
+    }
+    virtual void pre_special(MapResult const *r) {}
+    virtual void post_special(MapResult const *r) {}
+    void visit_ref(MapResult const *r)
+    {
+        pre_ref(r);
+        r->visitChildren(*this);
+        post_ref(r);
+    }
+    virtual void pre_ref(MapResult const *r) {}
+    virtual void post_ref(MapResult const *r) {}
+    void visit_capture(MapResult const *r)
+    {
+        pre_capture(r);
+        r->visitChildren(*this);
+        post_capture(r);
+    }
+    virtual void pre_capture(MapResult const *r) {}
+    virtual void post_capture(MapResult const *r) {}
+    void visit_noncapture(MapResult const *r)
+    {
+        pre_noncapture(r);
+        r->visitChildren(*this);
+        post_noncapture(r);
+    }
+    virtual void pre_noncapture(MapResult const *r) {}
+    virtual void post_noncapture(MapResult const *r) {}
+    void visit_txt(MapResult const *r)
+    {
+        pre_txt(r);
+        r->visitChildren(*this);
+        post_txt(r);
+    }
+    virtual void pre_txt(MapResult const *r) {}
+    virtual void post_txt(MapResult const *r) {}
+};
+
+using namespace std;
+
+class writeheader : public treewalker
+{
+    ofstream file;
+    string cname;
+
+  public:
+    virtual void pre_top(MapResult const *r) override
+    {
+        cname = r->get("name")->str();
+        string fname = "src/" + cname + ".gen.h";
+        file.open(fname.c_str());
+        if (file.is_open())
+        {
+            cout << "opened " << fname << endl;
+        }
+        else
+        {
+            cout << "could not open " << fname << " " << endl;
+            return;
+        }
+
+        file << "class " << cname << endl
+             << "{" << endl;
+    }
+    void visit_top(MapResult const *r)
+    {
+        pre_top(r);
+        if (file.is_open())
+        {
+            r->visitChildren(*this);
+            post_top(r);
+        }
+    }
+    virtual void post_top(MapResult const *r) override
+    {
+        file << "};" << endl;
+        file.close();
+    }
+};
+
+#define RULE(name) Rule name(#name, &visitor::visit_##name)
+
 int parse()
 {
-    Rule lilufile("lilufile"), element("element"), funcdef("funcdef"), expr("expr"), args("args"), arg("arg"), primary("primary");
+    // RULE(lilufile);
+    // RULE(element);
+    // RULE(funcdef);
+    // RULE(expr);
+    // RULE(args);
+    // RULE(arg);
+    // RULE(primary);
 
-    ps<ResultMap<Operator>> rmap = resmap<Operator>();
-    cps<ExpressionParser> expa = std::make_shared<ExpressionParser const>(primary, rmap);
-    rmap->add(new Operator(2, "+", 0));
+    // ps<ResultMap<Operator>> rmap = resmap<Operator>();
+    // cps<ExpressionParser> expa = make_shared<ExpressionParser const>(primary, rmap);
+    // rmap->add(new Operator(2, "+", 0));
+    // rmap->add(new Operator(2, "-", 0));
+    // rmap->add(new Operator(1, "*", 0));
+    // rmap->add(new Operator(1, "/", 0));
 
-    lilufile = rep(element);
-    element = funcdef | expr;
-    expr = expa;
-    args = opt(arg + rep("," + arg));
-    arg = id() / "name" + text(":") + id() / "type";
-    funcdef = "function" + id() / "name" + "(" + args + ")" + ":" + id() / "rtype" + "is" + element / "body" + "end";
-    primary = id();
+    // lilufile = rep(element);
+    // element = funcdef | expr;
+    // expr = expa;
+    // args = opt(arg + rep("," + arg));
+    // arg = id() / "name" + text(":") + id() / "type";
+    // funcdef = "function" + id() / "name" + "(" + args + ")" + ":" + id() / "rtype" + "is" + element / "body" + "end";
+    // auto parenthesized = "(" + expr + ")";
+    // primary = id() | number() | parenthesized;
 
-    std::ifstream file("first.lilu");
+    RULE(top);
+    RULE(rule);
+    RULE(alt);
+    RULE(seq);
+    RULE(repe);
+    RULE(named);
+    RULE(element);
+    RULE(special);
+    RULE(ref);
+    RULE(capture);
+    RULE(noncapture);
+    RULE(txt);
+
+    top = text("grammar") + id() / "name" + text(";") + rep(rule);
+    rule = (text("extern") / "extern" + id() / "name" + text(";")) | (id() / "name" + text("::=") + alt + text(";"));
+    alt = opt(text("|")) + seq + rep(text("|") + seq);
+    seq = rep(repe);
+    repe = named + opt((text("*") | text("+") | text("?")) / "op");
+    named = opt(id() / "name" + text("=")) + element;
+    element = special | ref | capture | noncapture | txt;
+    special = text("^") | text("$");
+    ref = id();
+    capture = text("(") + alt + text(")");
+    noncapture = text("[") + alt + text("]");
+    txt = stringtoken();
+
+    std::ifstream file("lilu.grm");
 
     if (file.is_open())
     {
@@ -734,11 +1024,13 @@ int parse()
         std::cout << "read: " << text << std::endl;
         LexerState ls;
         ls.ptr = text.c_str();
-        auto res = lilufile.match(ls);
+        auto res = top.match(ls);
         if (res != nullptr)
         {
             res->print(0);
             std::cout << std::endl;
+            writeheader v;
+            res->visit(v);
         }
         std::cout << "rest: " << ls.ptr << std::endl;
     }
