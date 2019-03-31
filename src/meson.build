@@ -2,7 +2,7 @@ pg = executable('parsergenerator', 'parser.cpp')
 
 gensrc = custom_target('make-lilu',
     input:'lilu.grm',
-    output:['lilu.gen.cpp','lilu.gen.h'],
+    output:['lilu.gen.cpp','lilu.gen.h','lilu.visitors.h'],
     command:[pg,'@INPUT@','@OUTDIR@'])
 
 llvm = dependency('LLVM')

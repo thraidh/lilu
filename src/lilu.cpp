@@ -1,11 +1,13 @@
 #include "expr_parser.h"
 #include "lilu.gen.h"
+#include "lilu.visitors.h"
 
-ResultMap<Operator> resmap = ResultMap<Operator>()
-                                 .add(new Operator(2, "+", 0))
-                                 .add(new Operator(2, "-", 0))
-                                 .add(new Operator(1, "*", 0))
-                                 .add(new Operator(1, "/", 0));
+ResultMap<Operator>
+    resmap = ResultMap<Operator>()
+                 .add(new Operator(2, "+", 0))
+                 .add(new Operator(2, "-", 0))
+                 .add(new Operator(1, "*", 0))
+                 .add(new Operator(1, "/", 0));
 
 Match const *primary_proxy(lilu *g, Cursor &c)
 {
@@ -30,11 +32,13 @@ int parse()
         Cursor c(text.c_str());
 
         lilu grammar;
-        auto res = grammar.lilufile(c);
+        Match const *res = grammar.lilufile(c);
         if (res != nullptr)
         {
             res->print(0);
             cout << endl;
+            liluPrintWalker v;
+            res->visit(v);
         }
         cout << "rest: [[[" << c << "]]]" << endl;
     }

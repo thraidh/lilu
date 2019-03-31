@@ -86,11 +86,14 @@ class Cursor
     }
 };
 
+class VisitorBase;
+
 class Match
 {
   public:
     virtual ~Match() {}
     virtual void print(int indent) const = 0;
+    virtual void visit(VisitorBase &v, void *ctx = nullptr) const {}
 };
 
 class TextMatch : public Match
@@ -105,11 +108,22 @@ class TextMatch : public Match
     }
 };
 
+class RuleMatch;
+
+class VisitorBase
+{
+  public:
+    virtual ~VisitorBase() {}
+    virtual void dispatch(RuleMatch const *m, void *ctx = nullptr) = 0;
+    virtual void visitTextResult(TextMatch const *) = 0;
+};
+
 class RuleMatch : public Match
 {
   public:
     multimap<string, Match const *> named;
     vector<Match const *> positional;
+    int rule_index;
     virtual ~RuleMatch() override
     {
         named.clear();
@@ -143,6 +157,17 @@ class RuleMatch : public Match
     {
         positional.push_back(inner);
         return this;
+    }
+    virtual void visit(VisitorBase &v, void *ctx = nullptr) const override
+    {
+        v.dispatch(this, ctx);
+    };
+    void visitChildren(VisitorBase &v, void *ctx) const
+    {
+        for (auto c : positional)
+        {
+            c->visit(v, ctx);
+        }
     }
 };
 

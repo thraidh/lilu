@@ -1045,6 +1045,152 @@ class writeheader : public treewalker<void *>
     }
 };
 
+class writevisitor : public treewalker<void *>
+{
+    ofstream file;
+    string cname;
+    unordered_set<string> rule_seen;
+    string dir;
+
+  public:
+    writevisitor(string const &d) : dir(d) {}
+    virtual bool pre_top(MapResult const *r, void *&, void *&) override
+    {
+        cname = r->get("name")->str();
+        string fname = dir + "/" + cname + ".visitors.h";
+        file.open(fname.c_str());
+        if (file.is_open())
+        {
+            cout << "opened " << fname << endl;
+        }
+        else
+        {
+            cout << "could not open " << fname << " " << endl;
+            return false;
+        }
+
+        file
+            << "#include \"parser_base.h\"" << endl
+            << endl;
+
+        return true;
+    }
+
+    virtual void post_top(MapResult const *r, void *&, void *&) override
+    {
+        file
+            << "enum" << endl
+            << "{" << endl
+            << "    no_rule=0";
+        for (auto n : rule_seen)
+        {
+            file << "," << endl
+                 << "    rule_" << n;
+        }
+        file << endl
+             << "};" << endl;
+
+        file
+            << "class Abstract" << cname << "Visitor : public VisitorBase" << endl
+            << "{" << endl
+            << "  public:" << endl
+            << "    virtual void dispatch(RuleMatch const *m, void *ctx) override" << endl
+            << "    {" << endl
+            << "        switch (m->rule_index)" << endl
+            << "        {" << endl;
+        for (auto n : rule_seen)
+        {
+            file
+                << "        case rule_" << n << ":" << endl
+                << "            visit_" << n << "(m, ctx);" << endl
+                << "            return;" << endl;
+        }
+        file
+            << "        }" << endl
+            << "    }" << endl;
+        for (auto n : rule_seen)
+        {
+            file
+                << "    virtual void visit_" << n << "(RuleMatch const *, void *ctx) = 0;" << endl;
+        }
+        file
+            << "};" << endl
+            << endl;
+
+        file
+            << "class " << cname << "Visitor : public Abstract" << cname << "Visitor" << endl
+            << "{" << endl
+            << "  public:" << endl;
+        for (auto n : rule_seen)
+        {
+            file
+                << "    virtual void visit_" << n << "(RuleMatch const *, void *ctx) override {}" << endl;
+        }
+        file
+            << "    virtual void visitTextResult(TextMatch const *) override {}" << endl
+            << "};" << endl
+            << endl;
+
+        file
+            << "template <typename CONTEXT>" << endl
+            << "class " << cname << "TreeWalker : public " << cname << "Visitor" << endl
+            << "{" << endl
+            << "  public:" << endl;
+        for (auto n : rule_seen)
+        {
+            file
+                << "    virtual void visit_" << n << "(RuleMatch const *r, void *ctx) override" << endl
+                << "    {" << endl
+                << "        CONTEXT local;" << endl
+                << "        if (pre_" << n << "(r, local, *(CONTEXT *)ctx))" << endl
+                << "        {" << endl
+                << "            r->visitChildren(*this, &local);" << endl
+                << "            post_" << n << "(r, local, *(CONTEXT *)ctx);" << endl
+                << "        }" << endl
+                << "    }" << endl
+                << "    virtual bool pre_" << n << "(RuleMatch const *r, CONTEXT &ctx, CONTEXT &parent)" << endl
+                << "    {" << endl
+                << "        return true;" << endl
+                << "    }" << endl
+                << "    virtual void post_" << n << "(RuleMatch const *r, CONTEXT &ctx, CONTEXT &parent) {}" << endl
+                << endl;
+        }
+        file
+            << "};" << endl
+            << endl;
+
+        file
+            << "class " << cname << "PrintWalker : public " << cname << "TreeWalker<void*>" << endl
+            << "{" << endl
+            << "  public:" << endl;
+        for (auto n : rule_seen)
+        {
+            file
+                << "    virtual bool pre_" << n << "(RuleMatch const *r, void* &ctx, void* &parent) override" << endl
+                << "    {" << endl
+                << "        cout << \"enter '" << n << "'\" << endl;" << endl
+                << "        return true;" << endl
+                << "    }" << endl
+                << "    virtual void post_" << n << "(RuleMatch const *r, void* &ctx, void* &parent) override" << endl
+                << "    {" << endl
+                << "        cout << \"leave '" << n << "'\" << endl;" << endl
+                << "    }" << endl
+                << endl;
+        }
+        file
+            << "};" << endl
+            << endl;
+
+        file.close();
+    }
+
+    virtual void post_rule(MapResult const *r, void *&, void *&) override
+    {
+        string rname = r->get("name")->str();
+        rule_seen.insert(rname);
+    }
+};
+
 static string empty_string;
 
 struct writeimpldata
@@ -1079,11 +1225,7 @@ class writeimpl : public treewalker<writeimpldata>
     bool have_name;
     int helperId;
     string dir;
-    /*
-static inline bool alt_1(lilu &g, Match const *&result, RuleMatch *&submatch, Cursor &c)
-{
 
-*/
     string startHelper(string const &name)
     {
         ++helperId;
@@ -1117,6 +1259,7 @@ static inline bool alt_1(lilu &g, Match const *&result, RuleMatch *&submatch, Cu
 
         file
             << "#include \"" << cname << ".gen.h\"" << endl
+            << "#include \"" << cname << ".visitors.h\"" << endl
             << endl;
 
         helperId = 0;
@@ -1329,6 +1472,7 @@ static inline bool alt_1(lilu &g, Match const *&result, RuleMatch *&submatch, Cu
              << "" << endl
              << "    if (" << local.childFuncName() << "(*this, inner, m, c))" << endl
              << "    {" << endl
+             << "        m->rule_index = rule_" << rname << ";" << endl
              << "        return m;" << endl
              << "    }" << endl
              << "    return nullptr;" << endl
@@ -1389,6 +1533,10 @@ int parse(string const &inputname, string const &dir)
             }
             {
                 writeimpl v(dir);
+                res->visit(v);
+            }
+            {
+                writevisitor v(dir);
                 res->visit(v);
             }
         }

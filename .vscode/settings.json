@@ -47,5 +47,6 @@
         "typeinfo": "cpp",
         "utility": "cpp",
         "algorithm": "cpp"
-    }
+    },
+    "C_Cpp.intelliSenseEngineFallback": "Enabled"
 }
