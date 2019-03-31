@@ -40,8 +40,8 @@
 # Stage 6
 
 - create stage 4 lilu compiler
-    - lilu.grm -> [parsergenerator] -> Lilu.gen.{cpp,h} => stage4 lilu parser
-    - scaffolding/driver (like main(), parse() etc)
+    - lilu.grm -> [parsergenerator] -> Lilu.gen.{cpp,h} => stage4 lilu parser [done]
+    - scaffolding/driver (like main(), parse() etc) [done]
     - AST generator (implement visitors and such)
 
 # Stage

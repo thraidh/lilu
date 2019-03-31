@@ -1,4 +1,4 @@
-grammar lilu;
+grammar Lilu;
 
 lilufile ::= ^ element* $;
 element ::= funcdef | expr ;

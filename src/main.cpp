@@ -22,6 +22,7 @@
 #include <memory>
 #include <vector>
 
+using namespace std;
 using namespace llvm;
 
 int add10(int x)
@@ -30,21 +31,18 @@ int add10(int x)
     return x + 10;
 }
 
-int parse();
-//int handparse();
+int parse(string const &inputname);
 
-int test()
+int main(int argc, char **argv)
 {
-    return {};
-}
-int main()
-{
-    parse();
+    if (argc != 2)
+    {
+        cerr << "need exactly one argument (got " << (argc - 1) << ")" << endl;
+        return 1;
+    }
+    parse(argv[1]);
 
     std::cout << "######################################" << std::endl;
-
-    //handparse();
-
     std::cout << "######################################" << std::endl;
 
     InitializeNativeTarget();
@@ -54,7 +52,7 @@ int main()
     LLVMContext Context;
 
     // Create some module to put our function into it.
-    std::unique_ptr<Module> Owner = make_unique<Module>("test", Context);
+    std::unique_ptr<Module> Owner = llvm::make_unique<Module>("test", Context);
     Module *M = Owner.get();
 
     // Create the add1 function entry and insert this entry into module M.  The

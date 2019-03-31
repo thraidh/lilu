@@ -1,9 +1,14 @@
 gensrc = custom_target('make-lilu',
     input:'lilu.grm',
-    output:['lilu.gen.cpp','lilu.gen.h','lilu.visitors.h'],
+    output:['Lilu.gen.cpp','Lilu.gen.h','Lilu.visitors.h'],
     command:[parsergenerator,'@INPUT@','@OUTDIR@'])
 
 llvm = dependency('LLVM')
 
-executable('lilu', 'main.cpp', 'lilu.cpp', gensrc,  dependencies: [llvm])
+executable('lilu',
+    'main.cpp', 'lilu.cpp',
+    gensrc,
+    dependencies: [llvm],
+    include_directories : inc,
+    )
 

@@ -1,6 +1,6 @@
+#include "Lilu.gen.h"
+#include "Lilu.visitors.h"
 #include "expr_parser.h"
-#include "lilu.gen.h"
-#include "lilu.visitors.h"
 
 ResultMap<Operator>
     resmap = ResultMap<Operator>()
@@ -9,19 +9,19 @@ ResultMap<Operator>
                  .add(new Operator(1, "*", 0))
                  .add(new Operator(1, "/", 0));
 
-Match const *primary_proxy(lilu *g, Cursor &c)
+Match const *primary_proxy(Lilu *g, Cursor &c)
 {
     return g->primary(c);
 }
 
-Match const *lilu::expr(Cursor &c)
+Match const *Lilu::expr(Cursor &c)
 {
     return expr_parser(c, this, primary_proxy, resmap);
 }
 
-int parse()
+int parse(string const &inputname)
 {
-    ifstream file("first.lilu");
+    ifstream file(inputname);
 
     if (file.is_open())
     {
@@ -31,15 +31,15 @@ int parse()
         cout << "read: " << text << endl;
         Cursor c(text.c_str());
 
-        lilu grammar;
+        Lilu grammar;
         Match const *res = grammar.lilufile(c);
         if (res != nullptr)
         {
             res->print(0);
             cout << endl;
-            liluPrintWalker v;
+            LiluPrintWalker v;
             v.visit(res);
-            liluTreeWalker<int, int> vv;
+            LiluTreeWalker<int, int> vv;
             vv.visit(res);
         }
         cout << "rest: [[[" << c << "]]]" << endl;
