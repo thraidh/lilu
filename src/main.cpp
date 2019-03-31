@@ -33,6 +33,10 @@ int add10(int x)
 int parse();
 //int handparse();
 
+int test()
+{
+    return {};
+}
 int main()
 {
     parse();

@@ -1081,7 +1081,10 @@ class writevisitor : public treewalker<void *>
         file
             << "enum" << endl
             << "{" << endl
-            << "    no_rule=0";
+            << "    no_match=0," << endl
+            << "    text_match=1," << endl
+            << "    expr_match=2," << endl
+            << "    before_rules";
         for (auto n : rule_seen)
         {
             file << "," << endl
@@ -1091,10 +1094,12 @@ class writevisitor : public treewalker<void *>
              << "};" << endl;
 
         file
-            << "class Abstract" << cname << "Visitor : public VisitorBase" << endl
+            << "template<typename RESULT>" << endl
+            << "class Abstract" << cname << "Visitor" << endl
             << "{" << endl
             << "  public:" << endl
-            << "    virtual void dispatch(RuleMatch const *m, void *ctx) override" << endl
+            << "    virtual ~Abstract" << cname << "Visitor() {}" << endl
+            << "    RESULT visit(Match const *m, void *ctx = nullptr)" << endl
             << "    {" << endl
             << "        switch (m->rule_index)" << endl
             << "        {" << endl;
@@ -1102,38 +1107,47 @@ class writevisitor : public treewalker<void *>
         {
             file
                 << "        case rule_" << n << ":" << endl
-                << "            visit_" << n << "(m, ctx);" << endl
-                << "            return;" << endl;
+                << "            return visit_" << n << "((RuleMatch const *)m, ctx);" << endl;
         }
         file
             << "        }" << endl
+            << "    }" << endl
+            << "    void visitChildren(RuleMatch const *m, void *ctx)" << endl
+            << "    {" << endl
+            << "        for (auto c : m->positional)" << endl
+            << "        {" << endl
+            << "            visit(c, ctx);" << endl
+            << "        }" << endl
             << "    }" << endl;
+
         for (auto n : rule_seen)
         {
             file
-                << "    virtual void visit_" << n << "(RuleMatch const *, void *ctx) = 0;" << endl;
+                << "    virtual RESULT visit_" << n << "(RuleMatch const *m, void *ctx) = 0;" << endl;
         }
         file
+            << "    virtual RESULT visitTextMatch(TextMatch const *, void *ctx) = 0;" << endl
             << "};" << endl
             << endl;
 
         file
-            << "class " << cname << "Visitor : public Abstract" << cname << "Visitor" << endl
+            << "template<typename RESULT>" << endl
+            << "class " << cname << "Visitor : public Abstract" << cname << "Visitor<RESULT>" << endl
             << "{" << endl
             << "  public:" << endl;
         for (auto n : rule_seen)
         {
             file
-                << "    virtual void visit_" << n << "(RuleMatch const *, void *ctx) override {}" << endl;
+                << "    virtual RESULT visit_" << n << "(RuleMatch const *, void *ctx) override {}" << endl;
         }
         file
-            << "    virtual void visitTextResult(TextMatch const *) override {}" << endl
+            << "    virtual RESULT visitTextMatch(TextMatch const *, void *ctx) override {}" << endl
             << "};" << endl
             << endl;
 
         file
             << "template <typename CONTEXT>" << endl
-            << "class " << cname << "TreeWalker : public " << cname << "Visitor" << endl
+            << "class " << cname << "TreeWalker : public " << cname << "Visitor<void>" << endl
             << "{" << endl
             << "  public:" << endl;
         for (auto n : rule_seen)
@@ -1144,7 +1158,7 @@ class writevisitor : public treewalker<void *>
                 << "        CONTEXT local;" << endl
                 << "        if (pre_" << n << "(r, local, *(CONTEXT *)ctx))" << endl
                 << "        {" << endl
-                << "            r->visitChildren(*this, &local);" << endl
+                << "            visitChildren(r, &local);" << endl
                 << "            post_" << n << "(r, local, *(CONTEXT *)ctx);" << endl
                 << "        }" << endl
                 << "    }" << endl

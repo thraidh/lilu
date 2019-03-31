@@ -38,7 +38,7 @@ int parse()
             res->print(0);
             cout << endl;
             liluPrintWalker v;
-            res->visit(v);
+            v.visit(res);
         }
         cout << "rest: [[[" << c << "]]]" << endl;
     }
