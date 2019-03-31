@@ -14,11 +14,28 @@
 # Stage 4
 
 - load file [done]
-- implement recursive-descent parser
-- implement expression precedence parser
-- create AST
+- implement internal DSL parser (stage0) [done]
+- implement recursive-descent parser [done]
+- implement expression precedence parser [done]
+- create AST [done]
+- create parsergenerator: lilu.grm -> [hardcoded IDSL stage0 grm parser] -> lilu.gen.{cpp,h} (results in: stage1 lilu parser) [done]
 
 # Stage 5
+
+- generate visitor output for stage1 parser
+- create parsergenerator: grammar.grm -> [hardcoded IDSL stage0 grm parser] -> grammar.gen.{cpp,h} (results in: stage1 grammar parser)
+- create parsergenerator: grammar.grm -> [generated stage1 grm parser] -> grammar.gen.{cpp,h} (results in: stage2 grammar parser)
+- stage1 and stage2 output should be identical
+- stage2 is now bootstrap
+- create parsergenerator: grammar.grm -> [generated stage2 grm parser] -> grammar.gen.{cpp,h} (results in: stage3 grammar parser)
+- stage3 is for parsergenerator development, upon successful changes to stage3, stage2 will be updated from stage3 and stage3 regenerated from stage2
+
+# Stage 6
+
+- create parsergenerator: lilu.grm -> [generated stage3 grm parser] -> grammar.gen.{cpp,h} (results in: stage4 lilu parser)
+
+
+# Stage
 
 - create LLVM IR from AST
 - run LLVM IR
