@@ -6,6 +6,7 @@
 #include <sstream>
 #include <stack>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 class MapResult;
@@ -15,18 +16,18 @@ class visitor
 {
   public:
     virtual ~visitor() {}
-    virtual void visit_top(MapResult const *) = 0;
-    virtual void visit_rule(MapResult const *) = 0;
-    virtual void visit_alt(MapResult const *) = 0;
-    virtual void visit_seq(MapResult const *) = 0;
-    virtual void visit_repe(MapResult const *) = 0;
-    virtual void visit_named(MapResult const *) = 0;
-    virtual void visit_element(MapResult const *) = 0;
-    virtual void visit_special(MapResult const *) = 0;
-    virtual void visit_ref(MapResult const *) = 0;
-    virtual void visit_capture(MapResult const *) = 0;
-    virtual void visit_noncapture(MapResult const *) = 0;
-    virtual void visit_txt(MapResult const *) = 0;
+    virtual void visit_top(MapResult const *, void *ctx) = 0;
+    virtual void visit_rule(MapResult const *, void *ctx) = 0;
+    virtual void visit_alt(MapResult const *, void *ctx) = 0;
+    virtual void visit_seq(MapResult const *, void *ctx) = 0;
+    virtual void visit_repe(MapResult const *, void *ctx) = 0;
+    virtual void visit_named(MapResult const *, void *ctx) = 0;
+    virtual void visit_element(MapResult const *, void *ctx) = 0;
+    virtual void visit_special(MapResult const *, void *ctx) = 0;
+    virtual void visit_ref(MapResult const *, void *ctx) = 0;
+    virtual void visit_capture(MapResult const *, void *ctx) = 0;
+    virtual void visit_noncapture(MapResult const *, void *ctx) = 0;
+    virtual void visit_txt(MapResult const *, void *ctx) = 0;
     virtual void visitTextResult(TextResult const *) {}
 };
 
@@ -36,13 +37,13 @@ using cps = std::shared_ptr<T const>;
 template <typename T>
 using ps = std::shared_ptr<T>;
 
-using VisitCallback = void (visitor::*)(MapResult const *);
+using VisitCallback = void (visitor::*)(MapResult const *, void *ctx);
 
 class Result
 {
   public:
     virtual void print(int indent) const = 0;
-    virtual void visit(visitor &v) const {};
+    virtual void visit(visitor &v, void *ctx = nullptr) const {};
     virtual void addToMap(class MapResult const *map) const {};
     virtual std::string_view text() const { return std::string_view(); }
     virtual std::string str() const { return std::string(text()); }
@@ -142,16 +143,20 @@ class MapResult : public NamedResult
             return nullresult;
         return it->second;
     }
-    virtual void visit(visitor &v) const override
+    Result const *child() const
+    {
+        return e;
+    }
+    virtual void visit(visitor &v, void *ctx) const override
     {
         if (visitcb != nullptr)
         {
             //std::cout << "visit " << name << std::endl;
-            (v.*visitcb)(this);
+            (v.*visitcb)(this, ctx);
             //std::cout << "leave " << name << std::endl;
         }
     };
-    void visitChildren(visitor &v) const
+    void visitChildren(visitor &v, void *ctx) const
     {
         if (map.empty())
         {
@@ -161,7 +166,7 @@ class MapResult : public NamedResult
         {
             for (auto kv : map)
             {
-                kv.second->visit(v);
+                kv.second->visit(v, ctx);
             }
         }
     }
@@ -817,116 +822,190 @@ end
 
 */
 
+template <typename CONTEXT>
 class treewalker : public visitor
 {
   public:
-    void visit_top(MapResult const *r)
+    virtual void visit_top(MapResult const *r, void *ctx) override
     {
-        pre_top(r);
-        r->visitChildren(*this);
-        post_top(r);
+        CONTEXT local;
+        if (pre_top(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_top(r, local, *(CONTEXT *)ctx);
+        }
     }
-    virtual void pre_top(MapResult const *r) {}
-    virtual void post_top(MapResult const *r) {}
-    void visit_rule(MapResult const *r)
+    virtual bool pre_top(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
     {
-        pre_rule(r);
-        r->visitChildren(*this);
-        post_rule(r);
+        return true;
     }
-    virtual void pre_rule(MapResult const *r) {}
-    virtual void post_rule(MapResult const *r) {}
-    void visit_alt(MapResult const *r)
+    virtual void post_top(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
+    virtual void visit_rule(MapResult const *r, void *ctx) override
     {
-        pre_alt(r);
-        r->visitChildren(*this);
-        post_alt(r);
+        CONTEXT local;
+        if (pre_rule(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_rule(r, local, *(CONTEXT *)ctx);
+        }
     }
-    virtual void pre_alt(MapResult const *r) {}
-    virtual void post_alt(MapResult const *r) {}
-    void visit_seq(MapResult const *r)
+    virtual bool pre_rule(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
     {
-        pre_seq(r);
-        r->visitChildren(*this);
-        post_seq(r);
+        return true;
     }
-    virtual void pre_seq(MapResult const *r) {}
-    virtual void post_seq(MapResult const *r) {}
-    void visit_repe(MapResult const *r)
+    virtual void post_rule(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
+    virtual void visit_alt(MapResult const *r, void *ctx) override
     {
-        pre_repe(r);
-        r->visitChildren(*this);
-        post_repe(r);
+        CONTEXT local;
+        if (pre_alt(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_alt(r, local, *(CONTEXT *)ctx);
+        }
     }
-    virtual void pre_repe(MapResult const *r) {}
-    virtual void post_repe(MapResult const *r) {}
-    void visit_named(MapResult const *r)
+    virtual bool pre_alt(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
     {
-        pre_named(r);
-        r->visitChildren(*this);
-        post_named(r);
+        return true;
     }
-    virtual void pre_named(MapResult const *r) {}
-    virtual void post_named(MapResult const *r) {}
-    void visit_element(MapResult const *r)
+    virtual void post_alt(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
+    virtual void visit_seq(MapResult const *r, void *ctx) override
     {
-        pre_element(r);
-        r->visitChildren(*this);
-        post_element(r);
+        CONTEXT local;
+        if (pre_seq(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_seq(r, local, *(CONTEXT *)ctx);
+        }
     }
-    virtual void pre_element(MapResult const *r) {}
-    virtual void post_element(MapResult const *r) {}
-    void visit_special(MapResult const *r)
+    virtual bool pre_seq(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
     {
-        pre_special(r);
-        r->visitChildren(*this);
-        post_special(r);
+        return true;
     }
-    virtual void pre_special(MapResult const *r) {}
-    virtual void post_special(MapResult const *r) {}
-    void visit_ref(MapResult const *r)
+    virtual void post_seq(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
+    virtual void visit_repe(MapResult const *r, void *ctx) override
     {
-        pre_ref(r);
-        r->visitChildren(*this);
-        post_ref(r);
+        CONTEXT local;
+        if (pre_repe(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_repe(r, local, *(CONTEXT *)ctx);
+        }
     }
-    virtual void pre_ref(MapResult const *r) {}
-    virtual void post_ref(MapResult const *r) {}
-    void visit_capture(MapResult const *r)
+    virtual bool pre_repe(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
     {
-        pre_capture(r);
-        r->visitChildren(*this);
-        post_capture(r);
+        return true;
     }
-    virtual void pre_capture(MapResult const *r) {}
-    virtual void post_capture(MapResult const *r) {}
-    void visit_noncapture(MapResult const *r)
+    virtual void post_repe(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
+    virtual void visit_named(MapResult const *r, void *ctx) override
     {
-        pre_noncapture(r);
-        r->visitChildren(*this);
-        post_noncapture(r);
+        CONTEXT local;
+        if (pre_named(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_named(r, local, *(CONTEXT *)ctx);
+        }
     }
-    virtual void pre_noncapture(MapResult const *r) {}
-    virtual void post_noncapture(MapResult const *r) {}
-    void visit_txt(MapResult const *r)
+    virtual bool pre_named(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
     {
-        pre_txt(r);
-        r->visitChildren(*this);
-        post_txt(r);
+        return true;
     }
-    virtual void pre_txt(MapResult const *r) {}
-    virtual void post_txt(MapResult const *r) {}
+    virtual void post_named(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
+    virtual void visit_element(MapResult const *r, void *ctx) override
+    {
+        CONTEXT local;
+        if (pre_element(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_element(r, local, *(CONTEXT *)ctx);
+        }
+    }
+    virtual bool pre_element(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
+    {
+        return true;
+    }
+    virtual void post_element(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
+    virtual void visit_special(MapResult const *r, void *ctx) override
+    {
+        CONTEXT local;
+        if (pre_special(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_special(r, local, *(CONTEXT *)ctx);
+        }
+    }
+    virtual bool pre_special(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
+    {
+        return true;
+    }
+    virtual void post_special(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
+    virtual void visit_ref(MapResult const *r, void *ctx) override
+    {
+        CONTEXT local;
+        if (pre_ref(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_ref(r, local, *(CONTEXT *)ctx);
+        }
+    }
+    virtual bool pre_ref(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
+    {
+        return true;
+    }
+    virtual void post_ref(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
+    virtual void visit_capture(MapResult const *r, void *ctx) override
+    {
+        CONTEXT local;
+        if (pre_capture(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_capture(r, local, *(CONTEXT *)ctx);
+        }
+    }
+    virtual bool pre_capture(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
+    {
+        return true;
+    }
+    virtual void post_capture(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
+    virtual void visit_noncapture(MapResult const *r, void *ctx) override
+    {
+        CONTEXT local;
+        if (pre_noncapture(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_noncapture(r, local, *(CONTEXT *)ctx);
+        }
+    }
+    virtual bool pre_noncapture(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
+    {
+        return true;
+    }
+    virtual void post_noncapture(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
+    virtual void visit_txt(MapResult const *r, void *ctx) override
+    {
+        CONTEXT local;
+        if (pre_txt(r, local, *(CONTEXT *)ctx))
+        {
+            r->visitChildren(*this, &local);
+            post_txt(r, local, *(CONTEXT *)ctx);
+        }
+    }
+    virtual bool pre_txt(MapResult const *r, CONTEXT &ctx, CONTEXT &parent)
+    {
+        return true;
+    }
+    virtual void post_txt(MapResult const *r, CONTEXT &ctx, CONTEXT &parent) {}
 };
 
 using namespace std;
 
-class writeheader : public treewalker
+class writeheader : public treewalker<void *>
 {
     ofstream file;
     string cname;
+    unordered_set<string> rule_seen;
 
   public:
-    virtual void pre_top(MapResult const *r) override
+    virtual bool pre_top(MapResult const *r, void *&, void *&) override
     {
         cname = r->get("name")->str();
         string fname = "src/" + cname + ".gen.h";
@@ -938,25 +1017,303 @@ class writeheader : public treewalker
         else
         {
             cout << "could not open " << fname << " " << endl;
-            return;
+            return false;
         }
 
-        file << "class " << cname << endl
-             << "{" << endl;
+        file
+            << "#include \"parser_base.h\"" << endl
+            << endl
+            << "class " << cname << " : public DefaultGrammar" << endl
+            << "{" << endl
+            << "  public:" << endl
+            << "    virtual ~" << cname << "() {}" << endl;
+        return true;
     }
-    void visit_top(MapResult const *r)
-    {
-        pre_top(r);
-        if (file.is_open())
-        {
-            r->visitChildren(*this);
-            post_top(r);
-        }
-    }
-    virtual void post_top(MapResult const *r) override
+    virtual void post_top(MapResult const *r, void *&, void *&) override
     {
         file << "};" << endl;
         file.close();
+    }
+
+    virtual void post_rule(MapResult const *r, void *&, void *&) override
+    {
+        string rname = r->get("name")->str();
+        if (rule_seen.insert(rname).second)
+            file << "    virtual Match const *" << rname << "(Cursor &c);" << endl;
+    }
+};
+
+static string empty_string;
+
+struct writeimpldata
+{
+    vector<string> childFuncNames;
+
+    void addChildFunc(string const &name)
+    {
+        childFuncNames.push_back(name);
+    }
+
+    void addChildFunc(writeimpldata const &other)
+    {
+        childFuncNames.push_back(other.childFuncName());
+    }
+
+    string const &childFuncName() const
+    {
+        if (childFuncNames.empty())
+            return empty_string;
+        return childFuncNames.back();
+    }
+};
+
+class writeimpl : public treewalker<writeimpldata>
+{
+    ofstream file;
+    string cname;
+    unordered_set<string> rule_seen;
+    vector<stringstream *> streams;
+    stringstream *cur;
+    bool have_name;
+    int helperId;
+    /*
+static inline bool alt_1(lilu &g, Match const *&result, RuleMatch *&submatch, Cursor &c)
+{
+
+*/
+    string startHelper(string const &name)
+    {
+        ++helperId;
+        string fname = name + "_" + to_string(helperId);
+        file << "static inline bool " << fname << "(" << cname << " &g, Match const *&result, RuleMatch *&submatch, Cursor &c)" << endl
+             << "{" << endl;
+        return fname;
+    }
+    void endHelper()
+    {
+        file << "}" << endl
+             << endl;
+    }
+
+  public:
+    virtual bool pre_top(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        cname = r->get("name")->str();
+        string fname = "src/" + cname + ".gen.cpp";
+        file.open(fname.c_str());
+        if (file.is_open())
+        {
+            cout << "opened " << fname << endl;
+        }
+        else
+        {
+            cout << "could not open " << fname << " " << endl;
+            return false;
+        }
+
+        file
+            << "#include \"" << cname << ".gen.h\"" << endl
+            << endl;
+
+        helperId = 0;
+        return true;
+    }
+    virtual void post_top(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        file.close();
+    }
+
+    virtual bool pre_rule(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        if (r->get("extern") != nullresult)
+            return false;
+        cur = new stringstream();
+        have_name = false;
+        return true;
+    }
+
+    virtual bool pre_named(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        if (r->get("name") != nullresult)
+        {
+            have_name = true;
+        }
+        return true;
+    }
+
+    virtual void post_named(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        have_name = false;
+        string name = r->get("name")->str();
+        if (name.empty())
+        {
+            parent.addChildFunc(local);
+        }
+        else
+        {
+            parent.addChildFunc(startHelper("named"));
+            file << "    if (" << local.childFuncName() << "(g, result, submatch, c))" << endl
+                 << "    {" << endl
+                 << "        submatch = addToMatch(submatch, \"" << name << "\", result);" << endl
+                 << "        return true;" << endl
+                 << "    }" << endl
+                 << "    return false;" << endl;
+            endHelper();
+        }
+    }
+
+    virtual void post_ref(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        string name = r->child()->str();
+        parent.addChildFunc(startHelper("ref"));
+        file
+            << "    result = g." << name << "(c);" << endl
+            << "    if (result)" << endl
+            << "    {" << endl
+            << "        c.skipSpace();" << endl;
+        if (!have_name)
+            file << "        submatch = addToMatch(submatch, \"" << name << "\", result);" << endl;
+        file
+            << "        return true;" << endl
+            << "    }" << endl
+            << "    return false;" << endl;
+        endHelper();
+    }
+
+    virtual void post_special(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        parent.addChildFunc(startHelper("special"));
+        file
+            << "    return true;" << endl;
+        endHelper();
+    }
+
+    virtual void post_element(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        parent.addChildFunc(local);
+    }
+
+    virtual void post_repe(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        string op = r->get("op")->str();
+        if (op.empty())
+        {
+            parent.addChildFunc(local);
+        }
+        else
+        {
+            parent.addChildFunc(startHelper("rep"));
+            if (op == "*")
+            {
+                file
+                    << "    while (true)" << endl
+                    << "    {" << endl
+                    << "        RuleMatch *subsubmatch = nullptr;" << endl
+                    << "        if (" << local.childFuncName() << "(g, result, subsubmatch, c))" << endl
+                    << "        {" << endl
+                    << "            submatch = mergeMatch(submatch, subsubmatch);" << endl
+                    << "        }" << endl
+                    << "        else" << endl
+                    << "        {" << endl
+                    << "            delete subsubmatch;" << endl
+                    << "            return true;" << endl
+                    << "        }" << endl
+                    << "    }" << endl;
+            }
+            else if (op == "?")
+            {
+                file
+                    << "    RuleMatch *subsubmatch = nullptr;" << endl
+                    << "    if (" << local.childFuncName() << "(g, result, subsubmatch, c))" << endl
+                    << "    {" << endl
+                    << "        submatch = mergeMatch(submatch, subsubmatch);" << endl
+                    << "    }" << endl
+                    << "    return true;" << endl;
+            }
+            endHelper();
+        }
+    }
+
+    virtual bool pre_seq(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        have_name = false;
+        return true;
+    }
+    virtual void post_seq(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        if (local.childFuncNames.size() <= 1)
+        {
+            parent.addChildFunc(local);
+            return;
+        }
+
+        parent.addChildFunc(startHelper("seq"));
+        file
+            << "    RuleMatch *subsubmatch = nullptr;" << endl
+            << "    Cursor start = c;" << endl
+            << "" << endl;
+        for (auto fn : local.childFuncNames)
+        {
+            file
+                << "    if (!" << fn << "(g, result, subsubmatch, c))" << endl
+                << "    {" << endl
+                << "        c = start;" << endl
+                << "        delete subsubmatch;" << endl
+                << "        return false;" << endl
+                << "    }" << endl
+                << "" << endl;
+        }
+        file
+            << "    submatch = mergeMatch(submatch, subsubmatch);" << endl
+            << "    return true;" << endl;
+        endHelper();
+    }
+    virtual void post_alt(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        if (local.childFuncNames.size() <= 1)
+        {
+            parent.addChildFunc(local);
+            return;
+        }
+
+        parent.addChildFunc(startHelper("alt"));
+        file
+            << "    RuleMatch *subsubmatch = nullptr;" << endl
+            << "    Cursor start = c;" << endl
+            << "" << endl;
+        for (auto fn : local.childFuncNames)
+        {
+            file
+                << "    if (!" << fn << "(g, result, subsubmatch, c))" << endl
+                << "    {" << endl
+                << "        c = start;" << endl
+                << "        delete subsubmatch;" << endl
+                << "        return false;" << endl
+                << "    }" << endl
+                << "" << endl;
+        }
+        file
+            << "    submatch = mergeMatch(submatch, subsubmatch);" << endl
+            << "    return true;" << endl;
+        endHelper();
+    }
+    virtual void post_rule(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        string rname = r->get("name")->str();
+
+        file << "Match const *" << cname << "::" << rname << "(Cursor &c)" << endl
+             << "{" << endl
+             << "    Match const *inner;" << endl
+             << "    RuleMatch *m = nullptr;" << endl
+             << "" << endl
+             << "    if (" << local.childFuncName() << "(*this, inner, m, c))" << endl
+             << "    {" << endl
+             << "        return m;" << endl
+             << "    }" << endl
+             << "    return nullptr;" << endl
+             << "}" << endl
+             << endl;
+        delete cur;
     }
 };
 
@@ -1029,8 +1386,14 @@ int parse()
         {
             res->print(0);
             std::cout << std::endl;
-            writeheader v;
-            res->visit(v);
+            {
+                writeheader v;
+                res->visit(v);
+            }
+            {
+                writeimpl v;
+                res->visit(v);
+            }
         }
         std::cout << "rest: " << ls.ptr << std::endl;
     }
