@@ -1111,6 +1111,7 @@ class writevisitor : public treewalker<void *>
         }
         file
             << "        }" << endl
+            << "        return default_value<RESULT>();" << endl
             << "    }" << endl
             << "    void visitChildren(RuleMatch const *m, void *ctx)" << endl
             << "    {" << endl
@@ -1138,16 +1139,84 @@ class writevisitor : public treewalker<void *>
         for (auto n : rule_seen)
         {
             file
-                << "    virtual RESULT visit_" << n << "(RuleMatch const *, void *ctx) override {}" << endl;
+                << "    virtual RESULT visit_" << n << "(RuleMatch const *, void *ctx) override { return default_value<RESULT>(); }" << endl;
         }
         file
-            << "    virtual RESULT visitTextMatch(TextMatch const *, void *ctx) override {}" << endl
+            << "    virtual RESULT visitTextMatch(TextMatch const *, void *ctx) override { return default_value<RESULT>(); }" << endl
+            << "};" << endl
+            << endl;
+
+        file
+            << "template <typename CONTEXT, typename RESULT>" << endl
+            << "class " << cname << "TreeWalker : public " << cname << "Visitor<RESULT>" << endl
+            << "{" << endl
+            << "  public:" << endl
+            << "    struct pre_result" << endl
+            << "    {" << endl
+            << "        RESULT result;" << endl
+            << "        bool success;" << endl
+            << "    };" << endl
+            << "    inline pre_result ok() { return {RESULT(), true}; }" << endl
+            << "    struct result_combiner" << endl
+            << "    {" << endl
+            << "        virtual ~result_combiner(){};" << endl
+            << "        virtual RESULT result() = 0;" << endl
+            << "        virtual void add(RESULT res) = 0;" << endl
+            << "    };" << endl
+            << "    struct last_result_combiner : public result_combiner" << endl
+            << "    {" << endl
+            << "        RESULT last;" << endl
+            << "        virtual RESULT result() override { return last; }" << endl
+            << "        virtual void add(RESULT res) override { last = res; };" << endl
+            << "        static result_combiner *combine(result_combiner *rc, RESULT res)" << endl
+            << "        {" << endl
+            << "            if (rc == nullptr)" << endl
+            << "                rc = new last_result_combiner();" << endl
+            << "            rc->add(res);" << endl
+            << "            return rc;" << endl
+            << "        }" << endl
+            << "    };" << endl;
+        for (auto n : rule_seen)
+        {
+            file
+                << "    virtual result_combiner *combine_results_" << n << "(result_combiner *rc, RESULT res)" << endl
+                << "    {" << endl
+                << "        return last_result_combiner::combine(rc, res);" << endl
+                << "    }" << endl
+                << "    virtual RESULT visit_" << n << "(RuleMatch const *r, void *ctx) override" << endl
+                << "    {" << endl
+                << "        CONTEXT local;" << endl
+                << "        pre_result res=pre_" << n << "(r, local, *(CONTEXT *)ctx);" << endl
+                << "        if (res.success)" << endl
+                << "        {" << endl
+                << "            result_combiner *rc = combine_results_element(nullptr, res.result);" << endl
+                << "            for (auto c : r->positional)" << endl
+                << "            {" << endl
+                << "                rc = combine_results_" << n << "(rc, this->visit(c, &local));" << endl
+                << "            }" << endl
+                << "            RESULT combined = rc ? rc->result() : res.result;" << endl
+                << "            delete rc;" << endl
+                << "            return post_" << n << "(r, combined, local, *(CONTEXT *)ctx);" << endl
+                << "        }" << endl
+                << "        else" << endl
+                << "        {" << endl
+                << "            return res.result;" << endl
+                << "        }" << endl
+                << "    }" << endl
+                << "    virtual pre_result pre_" << n << "(RuleMatch const *r, CONTEXT &ctx, CONTEXT &parent)" << endl
+                << "    {" << endl
+                << "        return ok();" << endl
+                << "    }" << endl
+                << "    virtual RESULT post_" << n << "(RuleMatch const *r, RESULT result, CONTEXT &ctx, CONTEXT &parent) { return result; }" << endl
+                << endl;
+        }
+        file
             << "};" << endl
             << endl;
 
         file
             << "template <typename CONTEXT>" << endl
-            << "class " << cname << "TreeWalker : public " << cname << "Visitor<void>" << endl
+            << "class " << cname << "TreeWalker<CONTEXT, void> : public " << cname << "Visitor<void>" << endl
             << "{" << endl
             << "  public:" << endl;
         for (auto n : rule_seen)
@@ -1158,7 +1227,7 @@ class writevisitor : public treewalker<void *>
                 << "        CONTEXT local;" << endl
                 << "        if (pre_" << n << "(r, local, *(CONTEXT *)ctx))" << endl
                 << "        {" << endl
-                << "            visitChildren(r, &local);" << endl
+                << "            this->visitChildren(r, &local);" << endl
                 << "            post_" << n << "(r, local, *(CONTEXT *)ctx);" << endl
                 << "        }" << endl
                 << "    }" << endl
@@ -1174,7 +1243,7 @@ class writevisitor : public treewalker<void *>
             << endl;
 
         file
-            << "class " << cname << "PrintWalker : public " << cname << "TreeWalker<void*>" << endl
+            << "class " << cname << "PrintWalker : public " << cname << "TreeWalker<void*, void>" << endl
             << "{" << endl
             << "  public:" << endl;
         for (auto n : rule_seen)

@@ -39,9 +39,18 @@ int parse()
             cout << endl;
             liluPrintWalker v;
             v.visit(res);
+            liluTreeWalker<int, int> vv;
+            vv.visit(res);
         }
         cout << "rest: [[[" << c << "]]]" << endl;
     }
 
     return 0;
 }
+
+// these should be their own cpp file
+template <typename V>
+V default_value() { return {}; }
+
+template <>
+void default_value<void>() { return; }

@@ -245,3 +245,9 @@ inline TextMatch const *DefaultGrammar::NUMBER(Cursor &c)
     c.error("expected number");
     return nullptr;
 }
+
+template <typename V>
+V default_value();
+
+template <>
+void default_value<void>();

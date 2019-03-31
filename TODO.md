@@ -22,7 +22,7 @@
 
 # Stage 5
 
-- generate visitor output for stage1 parser
+- generate visitor output for stage1 parser [done]
 - create parsergenerator: grammar.grm -> [hardcoded IDSL stage0 grm parser] -> grammar.gen.{cpp,h} (results in: stage1 grammar parser)
 - create parsergenerator: grammar.grm -> [generated stage1 grm parser] -> grammar.gen.{cpp,h} (results in: stage2 grammar parser)
 - stage1 and stage2 output should be identical
