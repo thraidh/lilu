@@ -6,7 +6,7 @@ gensrc = custom_target('make-lilu',
 llvm = dependency('LLVM')
 
 executable('lilu',
-    'main.cpp', 'lilu.cpp',
+    'main.cpp', 'lilu.cpp', 'AstBuilder.cpp',
     gensrc,
     dependencies: [llvm],
     include_directories : inc,

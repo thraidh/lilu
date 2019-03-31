@@ -34,11 +34,11 @@ int parse(string const &inputname, string const &dir)
 }
 
 // these should be their own cpp file
-template <typename V>
-V default_value() { return {}; }
+// template <typename V>
+// V default_value() { return {}; }
 
-template <>
-void default_value<void>() { return; }
+// template <>
+// void default_value<void>() { return; }
 
 int main(int argc, char **argv)
 {

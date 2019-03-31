@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -201,6 +202,7 @@ inline RuleMatch *mergeMatch(RuleMatch *outer, RuleMatch *&submatch)
 class DefaultGrammar
 {
   public:
+    vector<string> keywords;
     TextMatch const *ID(Cursor &c);
     TextMatch const *NUMBER(Cursor &c);
     TextMatch const *STRING(Cursor &c);
@@ -235,6 +237,12 @@ inline TextMatch const *DefaultGrammar::ID(Cursor &c)
         while (isalnum(c.la()))
         {
             c.consume();
+        }
+        if (find(keywords.begin(), keywords.end(), c.stringStartingAt(save)) != keywords.end())
+        {
+            c = save;
+            c.error("expected id but found keyword");
+            return nullptr;
         }
         cout << "matched id " << c.stringStartingAt(save) << endl;
         return new TextMatch(save, c);
@@ -288,7 +296,7 @@ inline TextMatch const *DefaultGrammar::STRING(Cursor &c)
 }
 
 template <typename V>
-V default_value();
+inline V default_value() { return {}; }
 
 template <>
-void default_value<void>();
+inline void default_value<void>() {}

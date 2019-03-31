@@ -19,6 +19,17 @@ Match const *Lilu::expr(Cursor &c)
     return expr_parser(c, this, primary_proxy, resmap);
 }
 
+struct AstNode
+{
+    virtual ~AstNode() {}
+    virtual string toString() const
+    {
+        return typeid(this).name();
+    }
+};
+
+AstNode const *generateAst(Match const *res);
+
 int parse(string const &inputname)
 {
     ifstream file(inputname);
@@ -32,15 +43,14 @@ int parse(string const &inputname)
         Cursor c(text.c_str());
 
         Lilu grammar;
+        grammar.keywords.push_back("end");
         Match const *res = grammar.lilufile(c);
         if (res != nullptr)
         {
             res->print(0);
             cout << endl;
-            LiluPrintWalker v;
-            v.visit(res);
-            LiluTreeWalker<int, int> vv;
-            vv.visit(res);
+            AstNode const *ast = generateAst(res);
+            cout << "AST: " << ast->toString() << endl;
         }
         cout << "rest: [[[" << c << "]]]" << endl;
     }
@@ -49,8 +59,8 @@ int parse(string const &inputname)
 }
 
 // these should be their own cpp file
-template <typename V>
-V default_value() { return {}; }
+// template <typename V>
+// V default_value() { return {}; }
 
-template <>
-void default_value<void>() { return; }
+// template <>
+// void default_value<void>() { return; }
