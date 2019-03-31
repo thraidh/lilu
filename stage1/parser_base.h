@@ -154,6 +154,12 @@ class RuleMatch : public Match
             return nullptr;
         return it->second;
     }
+    Match const *child(int n = 0) const
+    {
+        if (n >= positional.size())
+            return nullptr;
+        return positional[n];
+    }
 };
 
 inline RuleMatch *addToMatch(RuleMatch *outer, char const *name, Match const *inner)
