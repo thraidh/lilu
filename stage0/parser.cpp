@@ -1555,6 +1555,7 @@ class writeimpl : public treewalker<writeimpldata>
              << "" << endl
              << "    if (" << local.childFuncName() << "(*this, inner, m, c))" << endl
              << "    {" << endl
+             << "        if (!m) m = addToMatch(m, nullptr, inner);" << endl
              << "        m->rule_index = rule_" << rname << ";" << endl
              << "        return m;" << endl
              << "    }" << endl

@@ -23,8 +23,15 @@
 # Stage 5
 
 - generate visitor output for stage1 parser [done]
-- create parsergenerator: grammar.grm -> [hardcoded IDSL stage0 grm parser] -> grammar.gen.{cpp,h} (results in: stage1 grammar parser)
-- create parsergenerator: grammar.grm -> [generated stage1 grm parser] -> grammar.gen.{cpp,h} (results in: stage2 grammar parser)
+- create stage1 parsergenerator
+    - grammar.grm -> [hardcoded IDSL stage0 grm parser] -> grammar.gen.{cpp,h} => stage1 grammar parser [done]
+    - scaffolding/driver (like main(), parse() etc) [done]
+    - code generator (implement visitors and such)
+- create stage2 parsergenerator
+    - grammar.grm -> [generated stage1 grm parser] -> grammar.gen.{cpp,h} => stage2 grammar parser
+    - scaffolding/driver (like main(), parse() etc)
+    - code generator (implement visitors and such)
+    - scaffolding and code generator should be the same as for stage1
 - stage1 and stage2 output should be identical
 - stage2 is now bootstrap
 - create parsergenerator: grammar.grm -> [generated stage2 grm parser] -> grammar.gen.{cpp,h} (results in: stage3 grammar parser)

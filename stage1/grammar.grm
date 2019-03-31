@@ -1,0 +1,14 @@
+grammar Grammar;
+
+top ::= ^ "grammar" ID ";" rule* $;
+rule ::= extern="extern" ID ";" | ID "::=" alt ";" ;
+alt ::= "|"? seq [ "|" seq ]*;
+seq ::= rep *;
+rep ::= named op=[ "*" | "+" | "?" ]?;
+named ::= [ name=ID "=" ]? element ;
+element ::= special | ref | capture | noncapture | text ;
+special ::= "^" | "$" ;
+ref ::= ID;
+capture ::= "(" alt ")";
+noncapture ::= "[" alt "]";
+text ::= STRING;
