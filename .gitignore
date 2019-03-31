@@ -1,3 +1,4 @@
 /target/
 /.vscode/ipch/
 *.gen.*
+/tmp

@@ -92,6 +92,7 @@ class Match
     int rule_index;
     virtual ~Match() {}
     virtual void print(int indent) const = 0;
+    virtual string_view sv() const { return string_view(); }
 };
 
 class TextMatch : public Match
@@ -100,9 +101,10 @@ class TextMatch : public Match
 
   public:
     TextMatch(Cursor b, Cursor e) : begin(b), end(e) { rule_index = 1; }
+    virtual string_view sv() const override { return end.stringStartingAt(begin); }
     virtual void print(int indent) const override
     {
-        cout << "'" << end.stringStartingAt(begin) << "'" << endl;
+        cout << "'" << sv() << "'" << endl;
     }
 };
 
@@ -144,6 +146,19 @@ class RuleMatch : public Match
     {
         positional.push_back(inner);
         return this;
+    }
+    Match const *get(string const &key) const
+    {
+        auto it = named.find(key);
+        if (it == named.end())
+            return nullptr;
+        return it->second;
+    }
+    Match const *child(int n = 0) const
+    {
+        if (n >= positional.size())
+            return nullptr;
+        return positional[n];
     }
 };
 
@@ -188,6 +203,7 @@ class DefaultGrammar
   public:
     TextMatch const *ID(Cursor &c);
     TextMatch const *NUMBER(Cursor &c);
+    TextMatch const *STRING(Cursor &c);
     TextMatch const *TEXT(Cursor &c, string text);
 };
 
@@ -243,6 +259,31 @@ inline TextMatch const *DefaultGrammar::NUMBER(Cursor &c)
     }
     c = save;
     c.error("expected number");
+    return nullptr;
+}
+
+inline TextMatch const *DefaultGrammar::STRING(Cursor &c)
+{
+    Cursor save = c;
+    if (c.la() == '"')
+    {
+        c.consume();
+        while (c.la() != '"')
+        {
+            if (c.la() == 0)
+            {
+                c = save;
+                c.error("unterminated string");
+                return nullptr;
+            }
+            c.consume();
+        }
+        c.consume();
+        cout << "matched string " << c.stringStartingAt(save) << endl;
+        return new TextMatch(save, c);
+    }
+    c = save;
+    c.error("expected string");
     return nullptr;
 }
 

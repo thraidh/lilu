@@ -1,7 +1,7 @@
 gensrc = custom_target('make-lilu',
     input:'lilu.grm',
     output:['lilu.gen.cpp','lilu.gen.h','lilu.visitors.h'],
-    command:[stage0prog,'@INPUT@','@OUTDIR@'])
+    command:[parsergenerator,'@INPUT@','@OUTDIR@'])
 
 llvm = dependency('LLVM')
 
