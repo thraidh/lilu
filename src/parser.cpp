@@ -1193,6 +1193,16 @@ static inline bool alt_1(lilu &g, Match const *&result, RuleMatch *&submatch, Cu
         parent.addChildFunc(local);
     }
 
+    virtual void post_capture(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        parent.addChildFunc(local);
+    }
+
+    virtual void post_noncapture(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        parent.addChildFunc(local);
+    }
+
     virtual void post_repe(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
     {
         string op = r->get("op")->str();
@@ -1277,24 +1287,31 @@ static inline bool alt_1(lilu &g, Match const *&result, RuleMatch *&submatch, Cu
         }
 
         parent.addChildFunc(startHelper("alt"));
-        file
-            << "    RuleMatch *subsubmatch = nullptr;" << endl
-            << "    Cursor start = c;" << endl
-            << "" << endl;
         for (auto fn : local.childFuncNames)
         {
             file
-                << "    if (!" << fn << "(g, result, subsubmatch, c))" << endl
+                << "    if (" << fn << "(g, result, submatch, c))" << endl
                 << "    {" << endl
-                << "        c = start;" << endl
-                << "        delete subsubmatch;" << endl
-                << "        return false;" << endl
+                << "        return true;" << endl
                 << "    }" << endl
                 << "" << endl;
         }
         file
-            << "    submatch = mergeMatch(submatch, subsubmatch);" << endl
-            << "    return true;" << endl;
+            << "    return false;" << endl;
+        endHelper();
+    }
+    virtual void post_txt(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
+    {
+        string text = r->child()->str();
+        parent.addChildFunc(startHelper("text"));
+        file
+            << "    result = g.TEXT(c, " << text << ");" << endl
+            << "    if (result)" << endl
+            << "    {" << endl
+            << "        c.skipSpace();" << endl
+            << "        return true;" << endl
+            << "    }" << endl
+            << "    return false;" << endl;
         endHelper();
     }
     virtual void post_rule(MapResult const *r, writeimpldata &local, writeimpldata &parent) override

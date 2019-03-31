@@ -182,48 +182,32 @@ inline RuleMatch *mergeMatch(RuleMatch *outer, RuleMatch *&submatch)
     return outer;
 }
 
-inline TextMatch const *id(Cursor &c)
-{
-    Cursor save = c;
-    if (isalpha(c.la()))
-    {
-        c.consume();
-        while (isalnum(c.la()))
-        {
-            c.consume();
-        }
-        cout << "matched id " << c.stringStartingAt(save) << endl;
-        return new TextMatch(save, c);
-    }
-    c = save;
-    c.error("expected id");
-    return nullptr;
-}
-
-inline TextMatch const *number(Cursor &c)
-{
-    Cursor save = c;
-    if (isdigit(c.la()))
-    {
-        c.consume();
-        while (isdigit(c.la()))
-        {
-            c.consume();
-        }
-        cout << "matched number " << c.stringStartingAt(save) << endl;
-        return new TextMatch(save, c);
-    }
-    c = save;
-    c.error("expected number");
-    return nullptr;
-}
-
 class DefaultGrammar
 {
   public:
     TextMatch const *ID(Cursor &c);
     TextMatch const *NUMBER(Cursor &c);
+    TextMatch const *TEXT(Cursor &c, string text);
 };
+
+inline TextMatch const *DefaultGrammar::TEXT(Cursor &c, string text)
+{
+    Cursor save = c;
+    char const *tptr = text.c_str();
+    while (*tptr && c.la(0) == *tptr)
+    {
+        c.consume();
+        ++tptr;
+    }
+    if (*tptr == 0)
+    {
+        cout << "matched text " << c.stringStartingAt(save) << endl;
+        return new TextMatch(save, c);
+    }
+    c = save;
+    c.error("expected text " + text);
+    return nullptr;
+}
 
 inline TextMatch const *DefaultGrammar::ID(Cursor &c)
 {
