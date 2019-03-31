@@ -69,7 +69,7 @@ class TextResult : public Result
     {
         std::cout << "Text[" << text() << "]" << std::endl;
     }
-    virtual void visit(visitor &v) const
+    virtual void visit(visitor &v, void *ctx = nullptr) const override
     {
         v.visitTextResult(this);
     };
@@ -1003,12 +1003,14 @@ class writeheader : public treewalker<void *>
     ofstream file;
     string cname;
     unordered_set<string> rule_seen;
+    string dir;
 
   public:
+    writeheader(string const &d) : dir(d) {}
     virtual bool pre_top(MapResult const *r, void *&, void *&) override
     {
         cname = r->get("name")->str();
-        string fname = "src/" + cname + ".gen.h";
+        string fname = dir + "/" + cname + ".gen.h";
         file.open(fname.c_str());
         if (file.is_open())
         {
@@ -1076,6 +1078,7 @@ class writeimpl : public treewalker<writeimpldata>
     stringstream *cur;
     bool have_name;
     int helperId;
+    string dir;
     /*
 static inline bool alt_1(lilu &g, Match const *&result, RuleMatch *&submatch, Cursor &c)
 {
@@ -1096,10 +1099,11 @@ static inline bool alt_1(lilu &g, Match const *&result, RuleMatch *&submatch, Cu
     }
 
   public:
+    writeimpl(string const &d) : dir(d) {}
     virtual bool pre_top(MapResult const *r, writeimpldata &local, writeimpldata &parent) override
     {
         cname = r->get("name")->str();
-        string fname = "src/" + cname + ".gen.cpp";
+        string fname = dir + "/" + cname + ".gen.cpp";
         file.open(fname.c_str());
         if (file.is_open())
         {
@@ -1336,32 +1340,8 @@ static inline bool alt_1(lilu &g, Match const *&result, RuleMatch *&submatch, Cu
 
 #define RULE(name) Rule name(#name, &visitor::visit_##name)
 
-int parse()
+int parse(string const &inputname, string const &dir)
 {
-    // RULE(lilufile);
-    // RULE(element);
-    // RULE(funcdef);
-    // RULE(expr);
-    // RULE(args);
-    // RULE(arg);
-    // RULE(primary);
-
-    // ps<ResultMap<Operator>> rmap = resmap<Operator>();
-    // cps<ExpressionParser> expa = make_shared<ExpressionParser const>(primary, rmap);
-    // rmap->add(new Operator(2, "+", 0));
-    // rmap->add(new Operator(2, "-", 0));
-    // rmap->add(new Operator(1, "*", 0));
-    // rmap->add(new Operator(1, "/", 0));
-
-    // lilufile = rep(element);
-    // element = funcdef | expr;
-    // expr = expa;
-    // args = opt(arg + rep("," + arg));
-    // arg = id() / "name" + text(":") + id() / "type";
-    // funcdef = "function" + id() / "name" + "(" + args + ")" + ":" + id() / "rtype" + "is" + element / "body" + "end";
-    // auto parenthesized = "(" + expr + ")";
-    // primary = id() | number() | parenthesized;
-
     RULE(top);
     RULE(rule);
     RULE(alt);
@@ -1388,7 +1368,7 @@ int parse()
     noncapture = text("[") + alt + text("]");
     txt = stringtoken();
 
-    std::ifstream file("lilu.grm");
+    std::ifstream file(inputname);
 
     if (file.is_open())
     {
@@ -1404,16 +1384,27 @@ int parse()
             res->print(0);
             std::cout << std::endl;
             {
-                writeheader v;
+                writeheader v(dir);
                 res->visit(v);
             }
             {
-                writeimpl v;
+                writeimpl v(dir);
                 res->visit(v);
             }
         }
         std::cout << "rest: " << ls.ptr << std::endl;
     }
 
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    if (argc != 3)
+    {
+        cerr << "need exactly two arguments (got " << (argc - 1) << ")" << endl;
+        return 1;
+    }
+    parse(argv[1], argv[2]);
     return 0;
 }
