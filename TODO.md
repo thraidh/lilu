@@ -46,8 +46,20 @@
 
 # Stage 7
 
-- create LLVM IR from AST
-- run LLVM IR
+- create LLVM IR from AST [done]
+- run LLVM IR [done]
+
+# Stage 8
+
+- use ORC JIT [done]
+
+# Stage 9
+
+- implement function calls
+- implement variables
+- implement multiple statements
+- implement "if"
+- implement "while"
 
 # Stage
 

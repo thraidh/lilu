@@ -1,30 +1,14 @@
-#include <iostream>
 
 #include "AstBuilder.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/IR/Argument.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
+#include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/raw_ostream.h"
-#include <algorithm>
-#include <cassert>
-#include <memory>
-#include <vector>
+#include <iostream>
 
 using namespace std;
 using namespace llvm;
+using namespace llvm::orc;
 
 class BuildVisistor : public AstVisitor<Value *>
 {
@@ -233,14 +217,24 @@ int main(int argc, char **argv)
 }
 */
 
+std::unique_ptr<LLJIT> makeJit()
+{
+    auto ES = llvm::make_unique<ExecutionSession>();
+    auto JTMB = cantFail(JITTargetMachineBuilder::detectHost());
+    auto TM = cantFail(JTMB.createTargetMachine());
+    auto DL = TM->createDataLayout();
+    return cantFail(LLJIT::Create(std::move(ES), std::move(TM), std::move(DL)));
+}
+
 void buildIRFrom(AstNode const *n)
 {
     BuildVisistor v;
     v.visit(n);
     v.print();
 
-    ExecutionEngine *EE = EngineBuilder(std::move(v.Owner)).create();
-    EE->finalizeObject();
+    auto jit = makeJit();
+
+    cantFail(jit->addIRModule(std::move(v.Owner)));
 
     //    int (*fun)(int, int) = (int (*)(int, int))EE->getPointerToFunction(v.funcs["cde"]);
     // int (*fun)(int) = (int (*)(int))EE->getPointerToFunction(v.funcs["cde"]);
@@ -252,9 +246,8 @@ void buildIRFrom(AstNode const *n)
     //GenericValue gv = EE->runFunction(v.funcs["xyz"], args);
     //outs() << "Result: " << gv.IntVal << "\n";
 
-    int (*fun2)(int, int) = (int (*)(int, int))EE->getPointerToFunction(v.funcs["abc"]);
+    auto fn = cantFail(jit->lookup("abc"));
+    int (*fun2)(int, int) = (int (*)(int, int))fn.getAddress();
     int res = fun2(2, 6);
     outs() << "Result: " << res << "\n";
-
-    delete EE;
 }
