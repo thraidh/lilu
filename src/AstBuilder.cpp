@@ -1,84 +1,6 @@
+#include "AstBuilder.h"
 #include "Lilu.visitors.h"
 #include "expr_parser.h"
-#include <unordered_set>
-
-struct AstNode
-{
-    virtual ~AstNode() {}
-    virtual string toString() const
-    {
-        return typeid(this).name();
-    }
-};
-
-struct FunctionNode : public AstNode
-{
-    string name, rtype;
-    AstNode const *body;
-    string toString() const override
-    {
-        return "function " + name + "(" + "):" + rtype + " is\n" + body->toString() + "end";
-    }
-};
-
-struct ExprNode : public AstNode
-{
-    string toString() const override
-    {
-        return "expr";
-    }
-};
-
-struct IdExprNode : public ExprNode
-{
-    string id;
-    IdExprNode(string_view sv) : id(sv) {}
-    IdExprNode(string const &s) : id(s) {}
-    string toString() const override
-    {
-        return id;
-    }
-};
-
-struct FuncallExprNode : public ExprNode
-{
-    vector<ExprNode const *> exprs;
-    string toString() const override
-    {
-        if (exprs.size() == 0)
-            return "<empty funcall>";
-        auto it = exprs.begin();
-        string ret = (*it)->toString() + "(";
-        ++it;
-        if (it != exprs.end())
-        {
-            ret += (*it)->toString();
-            ++it;
-        }
-        while (it != exprs.end())
-        {
-            ret += ", " + (*it)->toString();
-            ++it;
-        }
-        ret += ")";
-        return ret;
-    }
-};
-
-struct BlockNode : public AstNode
-{
-    vector<AstNode const *> elements;
-    string toString() const override
-    {
-        string ret = "[\n";
-        for (auto element : elements)
-        {
-            ret += element->toString() + "\n";
-        }
-        ret += "]\n";
-        return ret;
-    }
-};
 
 class AstBuilder : public LiluVisitor<AstNode const *>
 {
@@ -121,6 +43,7 @@ class AstBuilder : public LiluVisitor<AstNode const *>
         FunctionNode *fn = new FunctionNode();
         fn->name = rm->get("name")->sv();
         fn->rtype = rm->get("rtype")->sv();
+        visit(rm->get("args"), fn);
         auto body = rm->get("body");
         if (body)
             fn->body = visit(body);
@@ -129,26 +52,25 @@ class AstBuilder : public LiluVisitor<AstNode const *>
 
     virtual AstNode const *visit_primary(RuleMatch const *rm, void *ctx) override
     {
-        auto id = rm->get("ID");
-        if (id != nullptr)
-        {
-            return new IdExprNode(((TextMatch const *)id)->sv());
-        }
-        auto num = rm->get("NUMBER");
-        if (num != nullptr)
-        {
-            return new IdExprNode(((TextMatch const *)num)->sv());
-        }
-        auto ex = rm->get("expr");
-        if (ex != nullptr)
-        {
-            return visit(ex);
-        }
-        cout << "unknown primary: ";
-        rm->print(0);
-        return default_value<AstNode const *>();
+        return visit(rm->child());
     }
-    virtual AstNode const *visit_arg(RuleMatch const *, void *ctx) override { return default_value<AstNode const *>(); }
+    virtual AstNode const *visit_id(RuleMatch const *rm, void *ctx) override
+    {
+        return new IdExprNode(((TextMatch const *)rm->child())->sv());
+    }
+    virtual AstNode const *visit_number(RuleMatch const *rm, void *ctx) override
+    {
+        return new IdExprNode(((TextMatch const *)rm->child())->sv());
+    }
+    virtual AstNode const *visit_arg(RuleMatch const *rm, void *ctx) override
+    {
+        FunctionNode *fn = (FunctionNode *)ctx;
+        ArgNode *n = new ArgNode();
+        n->name = rm->get("name")->sv();
+        n->type = rm->get("type")->sv();
+        fn->args.push_back(n);
+        return n;
+    }
     virtual AstNode const *visit_expr(RuleMatch const *rm, void *ctx) override
     {
         FuncallExprNode *en = new FuncallExprNode();
@@ -159,7 +81,14 @@ class AstBuilder : public LiluVisitor<AstNode const *>
         }
         return en;
     }
-    virtual AstNode const *visit_args(RuleMatch const *, void *ctx) override { return default_value<AstNode const *>(); }
+    virtual AstNode const *visit_args(RuleMatch const *rm, void *ctx) override
+    {
+        for (auto child : rm->positional)
+        {
+            visit(child, ctx);
+        }
+        return nullptr;
+    }
     virtual AstNode const *visitTextMatch(TextMatch const *, void *ctx) override { return default_value<AstNode const *>(); }
     virtual AstNode const *visitExprMatch(RuleMatch const *rm, void *ctx) override
     {

@@ -1,13 +1,14 @@
+#include "AstBuilder.h"
 #include "Lilu.gen.h"
 #include "Lilu.visitors.h"
 #include "expr_parser.h"
 
-ResultMap<Operator>
-    resmap = ResultMap<Operator>()
-                 .add(new Operator(2, "+", 0))
-                 .add(new Operator(2, "-", 0))
-                 .add(new Operator(1, "*", 0))
-                 .add(new Operator(1, "/", 0));
+ResultMap<Operator> resmap =
+    ResultMap<Operator>()
+        .add(new Operator(2, "+", 0))
+        .add(new Operator(2, "-", 0))
+        .add(new Operator(1, "*", 0))
+        .add(new Operator(1, "/", 0));
 
 Match const *primary_proxy(Lilu *g, Cursor &c)
 {
@@ -18,17 +19,6 @@ Match const *Lilu::expr(Cursor &c)
 {
     return expr_parser(c, this, primary_proxy, resmap);
 }
-
-struct AstNode
-{
-    virtual ~AstNode() {}
-    virtual string toString() const
-    {
-        return typeid(this).name();
-    }
-};
-
-AstNode const *generateAst(Match const *res);
 
 int parse(string const &inputname)
 {
