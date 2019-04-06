@@ -170,12 +170,15 @@ inline RuleMatch *addToMatch(RuleMatch *outer, char const *name, Match const *in
         outer = new RuleMatch();
     }
 
-    if (name != nullptr)
+    if (inner)
     {
-        outer->named.insert({name, inner});
-    }
+        if (name != nullptr)
+        {
+            outer->named.insert({name, inner});
+        }
 
-    outer->positional.push_back(inner);
+        outer->positional.push_back(inner);
+    }
 
     return outer;
 }

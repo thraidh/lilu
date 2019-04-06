@@ -60,7 +60,7 @@ class AstBuilder : public LiluVisitor<AstNode const *>
     }
     virtual AstNode const *visit_number(RuleMatch const *rm, void *ctx) override
     {
-        return new IdExprNode(((TextMatch const *)rm->child())->sv());
+        return new NumberExprNode(((TextMatch const *)rm->child())->sv());
     }
     virtual AstNode const *visit_arg(RuleMatch const *rm, void *ctx) override
     {

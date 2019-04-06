@@ -20,6 +20,8 @@ Match const *Lilu::expr(Cursor &c)
     return expr_parser(c, this, primary_proxy, resmap);
 }
 
+void buildIRFrom(AstNode const *n);
+
 int parse(string const &inputname)
 {
     ifstream file(inputname);
@@ -41,6 +43,7 @@ int parse(string const &inputname)
             cout << endl;
             AstNode const *ast = generateAst(res);
             cout << "AST: " << ast->toString() << endl;
+            buildIRFrom(ast);
         }
         cout << "rest: [[[" << c << "]]]" << endl;
     }

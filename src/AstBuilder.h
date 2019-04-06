@@ -141,11 +141,12 @@ struct BlockNode : public AstNode
 
 AstNode const *generateAst(Match const *res);
 
+template <typename RESULT>
 class AstVisitor
 {
   public:
     virtual ~AstVisitor() {}
-    void visit(AstNode const *n, void *ctx = nullptr)
+    RESULT visit(AstNode const *n, void *ctx = nullptr)
     {
         switch (n->nodeTypeId())
         {
@@ -166,15 +167,16 @@ class AstVisitor
         case idBlockNode:
             return visit_BlockNode((BlockNode const *)n, ctx);
         }
+        return default_value<RESULT>();
     }
-    virtual void visit_AstNode(AstNode const *n, void *ctx){};
-    virtual void visit_ArgNode(ArgNode const *n, void *ctx){};
-    virtual void visit_FunctionNode(FunctionNode const *n, void *ctx){};
-    virtual void visit_BlockNode(BlockNode const *n, void *ctx){};
-    virtual void visit_ExprNode(ExprNode const *n, void *ctx){};
-    virtual void visit_IdExprNode(IdExprNode const *n, void *ctx){};
-    virtual void visit_NumberExprNode(NumberExprNode const *n, void *ctx){};
-    virtual void visit_FuncallExprNode(FuncallExprNode const *n, void *ctx){};
+    virtual RESULT visit_AstNode(AstNode const *n, void *ctx) { return default_value<RESULT>(); };
+    virtual RESULT visit_ArgNode(ArgNode const *n, void *ctx) { return default_value<RESULT>(); };
+    virtual RESULT visit_FunctionNode(FunctionNode const *n, void *ctx) { return default_value<RESULT>(); };
+    virtual RESULT visit_BlockNode(BlockNode const *n, void *ctx) { return default_value<RESULT>(); };
+    virtual RESULT visit_ExprNode(ExprNode const *n, void *ctx) { return default_value<RESULT>(); };
+    virtual RESULT visit_IdExprNode(IdExprNode const *n, void *ctx) { return default_value<RESULT>(); };
+    virtual RESULT visit_NumberExprNode(NumberExprNode const *n, void *ctx) { return default_value<RESULT>(); };
+    virtual RESULT visit_FuncallExprNode(FuncallExprNode const *n, void *ctx) { return default_value<RESULT>(); };
 };
 /*
 AstNode

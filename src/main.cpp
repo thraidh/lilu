@@ -40,14 +40,15 @@ int main(int argc, char **argv)
         cerr << "need exactly one argument (got " << (argc - 1) << ")" << endl;
         return 1;
     }
-    parse(argv[1]);
-
-    std::cout << "######################################" << std::endl;
-    std::cout << "######################################" << std::endl;
 
     InitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();
     LLVMInitializeNativeAsmParser();
+
+    parse(argv[1]);
+
+    std::cout << "######################################" << std::endl;
+    std::cout << "######################################" << std::endl;
 
     LLVMContext Context;
 
@@ -118,6 +119,7 @@ int main(int argc, char **argv)
     outs().flush();
 
     // Call the `foo' function with no arguments:
+    //ExecutionEngine *EE = EngineBuilder(std::move(Owner)).create();
     std::vector<GenericValue> noargs;
     GenericValue gv = EE->runFunction(FooF, noargs);
 
@@ -130,6 +132,7 @@ int main(int argc, char **argv)
     // Import result of execution:
     outs() << "Result: " << gv.IntVal << "\n";
     delete EE;
+
     llvm_shutdown();
 
     return 0;
