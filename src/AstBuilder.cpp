@@ -62,6 +62,16 @@ class AstBuilder : public LiluVisitor<AstNode const *>
     {
         return new NumberExprNode(((TextMatch const *)rm->child())->sv());
     }
+    virtual AstNode const *visit_funcall(RuleMatch const *rm, void *ctx) override
+    {
+        FuncallExprNode *en = new FuncallExprNode();
+        for (auto child : rm->positional)
+        {
+            auto ch = (ExprNode const *)visit(child);
+            en->exprs.push_back(ch);
+        }
+        return en;
+    }
     virtual AstNode const *visit_arg(RuleMatch const *rm, void *ctx) override
     {
         FunctionNode *fn = (FunctionNode *)ctx;
@@ -89,7 +99,10 @@ class AstBuilder : public LiluVisitor<AstNode const *>
         }
         return nullptr;
     }
-    virtual AstNode const *visitTextMatch(TextMatch const *, void *ctx) override { return default_value<AstNode const *>(); }
+    virtual AstNode const *visitTextMatch(TextMatch const *tm, void *ctx) override
+    {
+        return new IdExprNode(tm->sv());
+    }
     virtual AstNode const *visitExprMatch(RuleMatch const *rm, void *ctx) override
     {
         return visit_expr(rm, ctx);

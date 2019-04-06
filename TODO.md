@@ -55,7 +55,7 @@
 
 # Stage 9
 
-- implement function calls
+- implement function calls [done]
 - implement variables
 - implement multiple statements
 - implement "if"

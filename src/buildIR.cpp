@@ -91,7 +91,7 @@ class BuildVisistor : public AstVisitor<Value *>
         auto op = ((IdExprNode *)n->exprs[0])->id;
         auto it = n->exprs.begin();
         ++it;
-        vector<Value *> args;
+        SmallVector<Value *, 8> args;
         while (it != n->exprs.end())
         {
             args.push_back(visit(*it));
@@ -113,6 +113,15 @@ class BuildVisistor : public AstVisitor<Value *>
         {
             return builder.CreateSDiv(args[0], args[1]);
         }
+
+        auto func = funcs[op];
+        if (func)
+        {
+            CallInst *res = builder.CreateCall(func, args);
+            //CallRes->setTailCall(true);
+            return res;
+        }
+        cout << "cannot handle function '" << op << "'" << endl;
         return nullptr;
     };
 

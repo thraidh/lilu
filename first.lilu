@@ -1,13 +1,13 @@
-function abc(x:int, y:int):int is
-    x*x+y/x-(x+y)*4
-end
-
 function cde(x:int):int is
     x+10
 end
 
 function xyz(x:int,y:int):int is
-    10*x+y
+    10*x+cde(y)
+end
+
+function abc(x:int, y:int):int is
+    x*x+y/x-(x+y)*4+cde(15)
 end
 
 

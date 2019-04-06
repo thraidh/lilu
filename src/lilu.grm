@@ -7,7 +7,9 @@ extern expr;
 args ::= [ arg [ "," arg ]* ]?;
 arg ::= name=ID ":" type=ID;
 funcdef ::= "function" name=ID "(" args ")" ":" rtype=ID "is" body=block "end";
-primary ::= id | number | "(" expr ")" ;
+primary ::= funcall | id | number | "(" expr ")" ;
 id ::= ID;
 number ::= NUMBER;
+funcall ::= name=ID "(" [ expr [ "," expr ]* ]? ")";
+
 
