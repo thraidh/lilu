@@ -40,6 +40,7 @@ class VisitorGenerator : public GrammarTreeWalker<void *, void>
             << "    no_match=0," << endl
             << "    text_match=1," << endl
             << "    expr_match=2," << endl
+            << "    operator_match=3," << endl
             << "    before_rules";
         for (auto n : rule_seen)
         {
@@ -66,6 +67,12 @@ class VisitorGenerator : public GrammarTreeWalker<void *, void>
                 << "            return visit_" << n << "((RuleMatch const *)m, ctx);" << endl;
         }
         file
+            << "        case text_match:" << endl
+            << "            return visitTextMatch((TextMatch const *)m, ctx);" << endl
+            << "        case expr_match:" << endl
+            << "            return visitExprMatch((RuleMatch const *)m, ctx);" << endl
+            << "        case operator_match:" << endl
+            << "            return visitOperatorMatch((Operator const *)m, ctx);" << endl
             << "        }" << endl
             << "        return default_value<RESULT>();" << endl
             << "    }" << endl
@@ -83,7 +90,9 @@ class VisitorGenerator : public GrammarTreeWalker<void *, void>
                 << "    virtual RESULT visit_" << n << "(RuleMatch const *m, void *ctx) = 0;" << endl;
         }
         file
-            << "    virtual RESULT visitTextMatch(TextMatch const *, void *ctx) = 0;" << endl
+            << "    virtual RESULT visitTextMatch(TextMatch const *m, void *ctx) = 0;" << endl
+            << "    virtual RESULT visitExprMatch(RuleMatch const *m, void *ctx) = 0;" << endl
+            << "    virtual RESULT visitOperatorMatch(Operator const *m, void *ctx) = 0;" << endl
             << "};" << endl
             << endl;
 
@@ -95,10 +104,12 @@ class VisitorGenerator : public GrammarTreeWalker<void *, void>
         for (auto n : rule_seen)
         {
             file
-                << "    virtual RESULT visit_" << n << "(RuleMatch const *, void *ctx) override { return default_value<RESULT>(); }" << endl;
+                << "    virtual RESULT visit_" << n << "(RuleMatch const *m, void *ctx) override { return default_value<RESULT>(); }" << endl;
         }
         file
-            << "    virtual RESULT visitTextMatch(TextMatch const *, void *ctx) override { return default_value<RESULT>(); }" << endl
+            << "    virtual RESULT visitTextMatch(TextMatch const *m, void *ctx) override { return default_value<RESULT>(); }" << endl
+            << "    virtual RESULT visitExprMatch(RuleMatch const *m, void *ctx) override { return default_value<RESULT>(); }" << endl
+            << "    virtual RESULT visitOperatorMatch(Operator const *m, void *ctx) override { return default_value<RESULT>(); }" << endl
             << "};" << endl
             << endl;
 

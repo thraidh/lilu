@@ -43,6 +43,8 @@
     - lilu.grm -> [parsergenerator] -> Lilu.gen.{cpp,h} => stage4 lilu parser [done]
     - scaffolding/driver (like main(), parse() etc) [done]
     - AST generator (implement visitors and such)
+- add keywords automatically, so ID doesn't match them
+- add AST mode to parser, so it generates AST directly instead of parse tree?
 
 # Stage
 

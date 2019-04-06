@@ -300,3 +300,5 @@ inline V default_value() { return {}; }
 
 template <>
 inline void default_value<void>() {}
+
+class Operator;

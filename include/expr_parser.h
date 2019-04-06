@@ -78,7 +78,10 @@ class Operator : public Match
     int prec;
     string name;
 
-    Operator(int p, string n, int type) : prec(p), name(n) {}
+    Operator(int p, string n, int type) : prec(p), name(n)
+    {
+        rule_index = 3;
+    }
 
     bool tighterThan(int other_prec) const
     {
@@ -92,7 +95,7 @@ class Operator : public Match
     }
 };
 
-string getKeyFrom(Operator const *op)
+inline string getKeyFrom(Operator const *op)
 {
     return op->name;
 }
@@ -116,6 +119,7 @@ Match const *expr_parser(Cursor &c, GRAMMAR *g, PRIMARY primary, ResultMap<Opera
                 auto rhs = pop();
                 auto lhs = pop();
                 auto ex = new RuleMatch();
+                ex->rule_index = 2;
                 exprs.push_back(ex->add(op)->add(lhs)->add(rhs));
                 cout << "build expr " << op->name << "(" << lhs << "," << rhs << ")" << endl;
             }
