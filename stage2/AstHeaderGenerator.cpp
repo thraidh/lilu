@@ -119,6 +119,7 @@ class AstHeaderGenerator : public GrammarTreeWalker<void *, void>
             << "    virtual ~Abstract" << cname << "AstVisitor() {}" << endl
             << "    RESULT visit(AstNode *n, ARGS... args)" << endl
             << "    {" << endl
+            << "        if (!n) return default_value<RESULT>();" << endl
             << "        switch (n->_nodeTypeId)" << endl
             << "        {" << endl;
         for (auto node : anis)
@@ -154,13 +155,18 @@ class AstHeaderGenerator : public GrammarTreeWalker<void *, void>
             << "template <typename RESULT, typename... ARGS>" << endl
             << "class " << cname << "AstVisitor : public Abstract" << cname << "AstVisitor<RESULT, ARGS...>" << endl
             << "{" << endl
-            << "  public:" << endl;
+            << "  public:" << endl
+            << "    virtual RESULT default_result(AstNode *n, ARGS... args) { return default_value<RESULT>(); }" << endl;
 
         for (auto node : anis)
         {
             string &n = node->type;
-            file
-                << "    virtual RESULT visit_" << n << "(" << n << " *n, ARGS... args) { return default_value<RESULT>(); }" << endl;
+            if (node->parentType.empty())
+                file
+                    << "    RESULT visit_" << n << "(" << n << " *n, ARGS... args) override { return default_result(n, args...); }" << endl;
+            else
+                file
+                    << "    RESULT visit_" << n << "(" << n << " *n, ARGS... args) override { return visit_" << node->parentType << "(n, args...); }" << endl;
         }
         file
             << "};" << endl

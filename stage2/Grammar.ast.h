@@ -45,7 +45,7 @@ struct ID_Node : public TerminalNode
 struct InnerNode : public AstNode
 {
     InnerNode() { _nodeTypeId = InnerNodeTypeId; }
-    vector<AstNode*> _children;
+    vector<AstNode *> _children;
 };
 
 struct KeywordNode : public TerminalNode
@@ -68,60 +68,60 @@ struct STRING_Node : public TerminalNode
 struct alt_Node : public InnerNode
 {
     alt_Node() { _nodeTypeId = alt_NodeTypeId; }
-    vector<AstNode*> seq;
+    vector<AstNode *> seq;
 };
 
 struct capture_Node : public InnerNode
 {
     capture_Node() { _nodeTypeId = capture_NodeTypeId; }
-    vector<AstNode*> alt;
+    vector<AstNode *> alt;
 };
 
 struct element_Node : public InnerNode
 {
     element_Node() { _nodeTypeId = element_NodeTypeId; }
-    vector<AstNode*> capture;
-    vector<AstNode*> noncapture;
-    vector<AstNode*> ref;
-    vector<AstNode*> special;
-    vector<AstNode*> text;
+    vector<AstNode *> capture;
+    vector<AstNode *> noncapture;
+    vector<AstNode *> ref;
+    vector<AstNode *> special;
+    vector<AstNode *> text;
 };
 
 struct named_Node : public InnerNode
 {
     named_Node() { _nodeTypeId = named_NodeTypeId; }
-    vector<AstNode*> element;
+    vector<AstNode *> element;
 };
 
 struct noncapture_Node : public InnerNode
 {
     noncapture_Node() { _nodeTypeId = noncapture_NodeTypeId; }
-    vector<AstNode*> alt;
+    vector<AstNode *> alt;
 };
 
 struct ref_Node : public InnerNode
 {
     ref_Node() { _nodeTypeId = ref_NodeTypeId; }
-    vector<AstNode*> ID;
+    vector<AstNode *> ID;
 };
 
 struct rep_Node : public InnerNode
 {
     rep_Node() { _nodeTypeId = rep_NodeTypeId; }
-    vector<AstNode*> named;
+    vector<AstNode *> named;
 };
 
 struct rule_Node : public InnerNode
 {
     rule_Node() { _nodeTypeId = rule_NodeTypeId; }
-    vector<AstNode*> ID;
-    vector<AstNode*> alt;
+    vector<AstNode *> ID;
+    vector<AstNode *> alt;
 };
 
 struct seq_Node : public InnerNode
 {
     seq_Node() { _nodeTypeId = seq_NodeTypeId; }
-    vector<AstNode*> rep;
+    vector<AstNode *> rep;
 };
 
 struct special_Node : public InnerNode
@@ -132,14 +132,14 @@ struct special_Node : public InnerNode
 struct text_Node : public InnerNode
 {
     text_Node() { _nodeTypeId = text_NodeTypeId; }
-    vector<AstNode*> STRING;
+    vector<AstNode *> STRING;
 };
 
 struct top_Node : public InnerNode
 {
     top_Node() { _nodeTypeId = top_NodeTypeId; }
-    vector<AstNode*> ID;
-    vector<AstNode*> rule;
+    vector<AstNode *> ID;
+    vector<AstNode *> rule;
 };
 
 template <typename RESULT, typename... ARGS>
@@ -149,6 +149,8 @@ class AbstractGrammarAstVisitor
     virtual ~AbstractGrammarAstVisitor() {}
     RESULT visit(AstNode *n, ARGS... args)
     {
+        if (!n)
+            return default_value<RESULT>();
         switch (n->_nodeTypeId)
         {
         case AstNodeTypeId:
@@ -224,24 +226,24 @@ template <typename RESULT, typename... ARGS>
 class GrammarAstVisitor : public AbstractGrammarAstVisitor<RESULT, ARGS...>
 {
   public:
-    virtual RESULT visit_AstNode(AstNode *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_TerminalNode(TerminalNode *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_ID_Node(ID_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_InnerNode(InnerNode *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_KeywordNode(KeywordNode *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_NUMBER_Node(NUMBER_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_STRING_Node(STRING_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_alt_Node(alt_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_capture_Node(capture_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_element_Node(element_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_named_Node(named_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_noncapture_Node(noncapture_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_ref_Node(ref_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_rep_Node(rep_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_rule_Node(rule_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_seq_Node(seq_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_special_Node(special_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_text_Node(text_Node *n, ARGS... args) { return default_value<RESULT>(); }
-    virtual RESULT visit_top_Node(top_Node *n, ARGS... args) { return default_value<RESULT>(); }
+    virtual RESULT default_result(AstNode *n, ARGS... args) { return default_value<RESULT>(); }
+    RESULT visit_AstNode(AstNode *n, ARGS... args) override { return default_result(n, args...); }
+    RESULT visit_TerminalNode(TerminalNode *n, ARGS... args) override { return visit_AstNode(n, args...); }
+    RESULT visit_ID_Node(ID_Node *n, ARGS... args) override { return visit_TerminalNode(n, args...); }
+    RESULT visit_InnerNode(InnerNode *n, ARGS... args) override { return visit_AstNode(n, args...); }
+    RESULT visit_KeywordNode(KeywordNode *n, ARGS... args) override { return visit_TerminalNode(n, args...); }
+    RESULT visit_NUMBER_Node(NUMBER_Node *n, ARGS... args) override { return visit_TerminalNode(n, args...); }
+    RESULT visit_STRING_Node(STRING_Node *n, ARGS... args) override { return visit_TerminalNode(n, args...); }
+    RESULT visit_alt_Node(alt_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
+    RESULT visit_capture_Node(capture_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
+    RESULT visit_element_Node(element_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
+    RESULT visit_named_Node(named_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
+    RESULT visit_noncapture_Node(noncapture_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
+    RESULT visit_ref_Node(ref_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
+    RESULT visit_rep_Node(rep_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
+    RESULT visit_rule_Node(rule_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
+    RESULT visit_seq_Node(seq_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
+    RESULT visit_special_Node(special_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
+    RESULT visit_text_Node(text_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
+    RESULT visit_top_Node(top_Node *n, ARGS... args) override { return visit_InnerNode(n, args...); }
 };
-
