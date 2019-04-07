@@ -10,5 +10,6 @@ subdir('include')
 #subdir('stage1')
 subdir('bootstrap-pg')
 subdir('parsergenerator')
+subdir('stage2')
 subdir('src')
 

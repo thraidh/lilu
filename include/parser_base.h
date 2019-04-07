@@ -155,6 +155,17 @@ class RuleMatch : public Match
             return nullptr;
         return it->second;
     }
+    vector<Match const *> range(string const &key) const
+    {
+        vector<Match const *> v;
+        auto it = named.find(key);
+        while (it != named.end())
+        {
+            v.push_back(it->second);
+            ++it;
+        }
+        return v;
+    }
     Match const *child(int n = 0) const
     {
         if (n >= positional.size())

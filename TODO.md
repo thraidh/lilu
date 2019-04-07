@@ -73,6 +73,11 @@
         - if x is an alternation, pass name to each alt
         - if x is a literal or terminal, or rule call, convert it to AstNode and add the result to the name of the context
         - in any context: if x is a terminal or rule call, add its AstNode result to to positional elements of the rule
+    - what needs to be generated
+        - enum
+        - ast nodes
+        - parser code
+        - visitors
     - AstNodeInfo
         - `name: string`
         - `names: map<string, NameInfo>`
@@ -93,6 +98,67 @@
                 - id ::= ID
                 - id_Node does not exist (it is actually ID_Node), but id_NodeTypeId exists
                 - instead of id_Node.children.push_back(ID_Node), do ID_Node.nodeTypeId=id_NodeTypeId, return ID_Node
+            - a rule that results in just one not explicitly named result, will just pass that result through
+                - this can happen for
+                    - alternation alts, which are just one rule invocation
+                    - repetitions, where exactly one element is matched
+                    - sequences, where some elements are optional
+                - the check has to be done at runtime
+                    - eg: named ::= [ name=ID "=" ]? element
+                    - if the optional clause is not matched, there is only element and the result can be passed through
+                    - if the optional is matched, we need to create a new AST node
+                - every subrule has a
+                    - min: minimal number of results
+                    - one: number of results if one element is given (eg in an optional or repetition)
+                    - isnamed: if this subrule or its elements are named
+                - don't need to do a runtime check for passthrough, if
+                    - min>1
+                    - min==1 && isnamed
+                    - min==0 && one>1
+                - rules for calculation
+                    - literal
+                        - min: 0
+                        - one: 0
+                        - isnamed: false
+                    - terminal, rulecall/ref, special
+                        - min: 1
+                        - one: 1
+                        - isnamed: false
+                    - named literal
+                        - min: 1
+                        - one: 1
+                        - isnamed: true
+                    - named other
+                        - min: other.min
+                        - one: other.one
+                        - isnamed: true
+                    - alt
+                        - min: minimum of all alts.min
+                        - one: minimum of all alts.one
+                        - isnamed: true if for all alts a: a.min>0 && a.isnamed (otherwise there can be an unnamed alt)
+                    - seq
+                        - min: sum of elem.min
+                        - one: min/i(min + elem[i].one - elem[i].min) (pretend all elements are at min, except for one. if even the smallest of those is above 1, the result can never be a passthrough)
+                        - isnamed: true if for any elem e: e.min>0 && e.isnamed
+                    - rep *
+                        - min: 0
+                        - one: elem.one (the smallest possible non-empty result)
+                        - isnamed: false (in the min case, there is nothing named)
+                    - rep ?
+                        - min: 0
+                        - one: elem.one
+                        - isnamed: false
+                    - rep +
+                        - min: elem.min (but it is an error to repeat something that could be empty)
+                        - one: elem.one
+                        - isnamed: elem.isnamed (min is at least 1)
+                    - capture, noncapture
+                        - min: elem.min
+                        - one: elem.one
+                        - isnamed: elem.isnamed
+            - each subrule carries information about the vars (implicit names, explicit names, positional) that may be changed, if the subrule was successful
+                - on failure the subrule cleans up after itself and reverts its changes
+                - on success the calling subrule is owner of the changes and has to clean them up, if it fails
         - second pass generates sources
     - AstNode
         - nodeTypeId: enum (generated with one entry for each node)
