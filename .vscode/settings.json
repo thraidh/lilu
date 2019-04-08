@@ -5,6 +5,8 @@
         "atomic": "cpp",
         "*.tcc": "cpp",
         "bitset": "cpp",
+        "set": "cpp",
+        "map": "cpp",
         "cctype": "cpp",
         "chrono": "cpp",
         "clocale": "cpp",
@@ -51,5 +53,6 @@
         "list": "cpp",
         "new": "cpp"
     },
-    "C_Cpp.intelliSenseEngineFallback": "Disabled"
+    "C_Cpp.intelliSenseEngineFallback": "Disabled",
+    "cquery.cacheDirectory": "${workspaceFolder}/.vscode/cquery_cached_index/"
 }
