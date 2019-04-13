@@ -17,11 +17,11 @@ struct Element {
     Element() : name() {}
 };
 
-struct Production {
+struct Rule {
     string_view name;
     vector<Element *> elements;
 
-    Production() : name(), elements() {}
+    Rule() : name(), elements() {}
     void print() {
         cout << name << " =";
         for (auto e : elements) {
@@ -37,18 +37,19 @@ struct Terminal : public Element {
     void print() { cout << name << endl; }
 };
 
-struct Rule : public Element {
-    vector<Production *> productions;
+struct Symbol : public Element {
+    vector<Rule *> rules;
 
-    Rule() : Element(), productions() {}
+    Symbol() : Element(), rules() {}
     void print() {
-        for (auto p : productions)
+        for (auto p : rules)
             p->print();
     }
 };
 
-map<string, Rule *> rules;
+map<string, Symbol *> symbols;
 map<string, Terminal *> terminals;
+vector<Rule *> rules;
 
 char const *skipSpace(char const *ptr) {
     while (isspace(*ptr))
@@ -96,20 +97,20 @@ char const *STRING(char const *ptr) {
 
 char const *readGrammar(char const *ptr) {
     ptr = skipSpace(ptr);
-    auto production = new Production;
     while (*ptr) {
         auto m = ID(ptr);
+        auto rule = new Rule();
         if (m) {
-            production->name = string_view(ptr, m - ptr);
+            rule->name = string_view(ptr, m - ptr);
         } else {
-            delete production;
+            delete rule;
             return ptr;
         }
 
         ptr = skipSpace(m);
         m = literal(ptr, "=");
         if (!m) {
-            delete production;
+            delete rule;
             return ptr;
         }
 
@@ -119,19 +120,18 @@ char const *readGrammar(char const *ptr) {
             m = ID(ptr);
             if (m) {
                 string_view sv = string_view(ptr, m - ptr);
-                cout << "found " << sv << endl;
                 if (isupper(sv[0])) {
                     Terminal *&term = terminals[string(sv)];
                     if (!term) {
                         term = new Terminal();
                         term->name = sv;
                     }
-                    production->elements.push_back(term);
+                    rule->elements.push_back(term);
                 } else {
-                    Rule *&rule = rules[string(sv)];
-                    if (!rule)
-                        rule = new Rule();
-                    production->elements.push_back(rule);
+                    Symbol *&symbol = symbols[string(sv)];
+                    if (!symbol)
+                        symbol = new Symbol();
+                    rule->elements.push_back(symbol);
                 }
                 ptr = m;
                 continue;
@@ -140,14 +140,12 @@ char const *readGrammar(char const *ptr) {
             m = STRING(ptr);
             if (m) {
                 string_view sv = string_view(ptr, m - ptr);
-                cout << "found " << sv << endl;
                 Terminal *&term = terminals[string(sv)];
                 if (!term) {
                     term = new Terminal();
                     term->name = sv;
                 }
-                production->elements.push_back(term);
-                cout << "got " << production->elements.back()->name << endl;
+                rule->elements.push_back(term);
                 ptr = m;
                 continue;
             }
@@ -158,19 +156,73 @@ char const *readGrammar(char const *ptr) {
                 break;
             }
 
-            delete production;
+            delete rule;
             return ptr;
         }
 
-        Rule *&rule = rules[string(production->name)];
-        if (!rule)
-            rule = new Rule();
-        rule->name = production->name;
-        rule->productions.push_back(production);
-        production = new Production;
+        Symbol *&symbol = symbols[string(rule->name)];
+        if (!symbol)
+            symbol = new Symbol();
+        symbol->name = rule->name;
+        symbol->rules.push_back(rule);
+        rules.push_back(rule);
         ptr = skipSpace(ptr);
     }
     return ptr;
+}
+
+inline auto symbol(string const &str) {
+    auto &ret = symbols[str];
+    if (!ret) {
+        ret = new Symbol();
+        ret->name = str;
+    }
+    return ret;
+}
+
+inline auto symbol(char const *str) {
+    auto &ret = symbols[str];
+    if (!ret) {
+        ret = new Symbol();
+        ret->name = str;
+    }
+    return ret;
+}
+
+inline auto symbol(string_view const &str) {
+    auto &ret = symbols[string(str)];
+    if (!ret) {
+        ret = new Symbol();
+        ret->name = str;
+    }
+    return ret;
+}
+
+inline auto terminal(char const *str) {
+    auto &ret = terminals[str];
+    if (!ret) {
+        ret = new Terminal();
+        ret->name = str;
+    }
+    return ret;
+}
+
+inline auto terminal(string const &str) {
+    auto &ret = terminals[str];
+    if (!ret) {
+        ret = new Terminal();
+        ret->name = str;
+    }
+    return ret;
+}
+
+inline auto terminal(string_view const &str) {
+    auto &ret = terminals[string(str)];
+    if (!ret) {
+        ret = new Terminal();
+        ret->name = str;
+    }
+    return ret;
 }
 
 int parse(string const &inputname, string const &dir) {
@@ -181,12 +233,16 @@ int parse(string const &inputname, string const &dir) {
         std::stringstream ss;
         ss << file.rdbuf();
         std::string text = ss.str();
-        std::cout << "read: " << text << std::endl;
+        cout << "read: " << text << endl << "======" << endl;
+        rules.push_back(new Rule());
         auto ptr = text.c_str();
         auto res = readGrammar(ptr);
+        rules[0]->name = "0";
+        rules[0]->elements.push_back(symbol(rules[1]->name));
+        rules[0]->elements.push_back(terminal("$"));
         if (res != nullptr) {
             for (auto e : rules)
-                e.second->print();
+                e->print();
             for (auto e : terminals)
                 e.second->print();
         }
