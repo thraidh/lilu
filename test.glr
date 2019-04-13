@@ -1,6 +1,6 @@
 lilu = elements;
 elements = elements element;
+elements =;
 element = ID;
 element = 'nix';
-element =;
 
