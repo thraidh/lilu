@@ -17,12 +17,15 @@ using namespace std;
 struct Element {
     string_view name;
     bool isTerminal;
+    int index;
+
     Element(bool t) : name(), isTerminal(t) {}
 };
 
 struct Rule {
     string_view name;
     vector<Element *> elements;
+    int index;
 
     Rule() : name(), elements() {}
     void print() {
@@ -130,6 +133,66 @@ char const *STRING(char const *ptr) {
     return ptr;
 }
 
+inline auto symbol(string const &str) {
+    auto &ret = symbols[str];
+    if (!ret) {
+        ret = new Symbol();
+        ret->name = str;
+        ret->index = -symbols.size();
+    }
+    return ret;
+}
+
+inline auto symbol(char const *str) {
+    auto &ret = symbols[str];
+    if (!ret) {
+        ret = new Symbol();
+        ret->name = str;
+        ret->index = -symbols.size();
+    }
+    return ret;
+}
+
+inline auto symbol(string_view const &str) {
+    auto &ret = symbols[string(str)];
+    if (!ret) {
+        ret = new Symbol();
+        ret->name = str;
+        ret->index = -symbols.size();
+    }
+    return ret;
+}
+
+inline auto terminal(char const *str) {
+    auto &ret = terminals[str];
+    if (!ret) {
+        ret = new Terminal();
+        ret->name = str;
+        ret->index = terminals.size();
+    }
+    return ret;
+}
+
+inline auto terminal(string const &str) {
+    auto &ret = terminals[str];
+    if (!ret) {
+        ret = new Terminal();
+        ret->name = str;
+        ret->index = terminals.size();
+    }
+    return ret;
+}
+
+inline auto terminal(string_view const &str) {
+    auto &ret = terminals[string(str)];
+    if (!ret) {
+        ret = new Terminal();
+        ret->name = str;
+        ret->index = terminals.size();
+    }
+    return ret;
+}
+
 char const *readGrammar(char const *ptr) {
     ptr = skipSpace(ptr);
     while (*ptr) {
@@ -156,17 +219,11 @@ char const *readGrammar(char const *ptr) {
             if (m) {
                 string_view sv = string_view(ptr, m - ptr);
                 if (isupper(sv[0])) {
-                    Terminal *&term = terminals[string(sv)];
-                    if (!term) {
-                        term = new Terminal();
-                        term->name = sv;
-                    }
+                    Terminal *term = terminal(sv);
                     rule->elements.push_back(term);
                 } else {
-                    Symbol *&symbol = symbols[string(sv)];
-                    if (!symbol)
-                        symbol = new Symbol();
-                    rule->elements.push_back(symbol);
+                    Symbol *sym = symbol(sv);
+                    rule->elements.push_back(sym);
                 }
                 ptr = m;
                 continue;
@@ -175,11 +232,7 @@ char const *readGrammar(char const *ptr) {
             m = STRING(ptr);
             if (m) {
                 string_view sv = string_view(ptr, m - ptr);
-                Terminal *&term = terminals[string(sv)];
-                if (!term) {
-                    term = new Terminal();
-                    term->name = sv;
-                }
+                Terminal *term = terminal(sv);
                 rule->elements.push_back(term);
                 ptr = m;
                 continue;
@@ -195,69 +248,14 @@ char const *readGrammar(char const *ptr) {
             return ptr;
         }
 
-        Symbol *&symbol = symbols[string(rule->name)];
-        if (!symbol)
-            symbol = new Symbol();
-        symbol->name = rule->name;
-        symbol->add(rule);
+        Symbol *sym = symbol(rule->name);
+        sym->name = rule->name;
+        sym->add(rule);
+        rule->index = rules.size();
         rules.push_back(rule);
         ptr = skipSpace(ptr);
     }
     return ptr;
-}
-
-inline auto symbol(string const &str) {
-    auto &ret = symbols[str];
-    if (!ret) {
-        ret = new Symbol();
-        ret->name = str;
-    }
-    return ret;
-}
-
-inline auto symbol(char const *str) {
-    auto &ret = symbols[str];
-    if (!ret) {
-        ret = new Symbol();
-        ret->name = str;
-    }
-    return ret;
-}
-
-inline auto symbol(string_view const &str) {
-    auto &ret = symbols[string(str)];
-    if (!ret) {
-        ret = new Symbol();
-        ret->name = str;
-    }
-    return ret;
-}
-
-inline auto terminal(char const *str) {
-    auto &ret = terminals[str];
-    if (!ret) {
-        ret = new Terminal();
-        ret->name = str;
-    }
-    return ret;
-}
-
-inline auto terminal(string const &str) {
-    auto &ret = terminals[str];
-    if (!ret) {
-        ret = new Terminal();
-        ret->name = str;
-    }
-    return ret;
-}
-
-inline auto terminal(string_view const &str) {
-    auto &ret = terminals[string(str)];
-    if (!ret) {
-        ret = new Terminal();
-        ret->name = str;
-    }
-    return ret;
 }
 
 struct State;
@@ -471,12 +469,10 @@ State *newState() {
     return ret;
 }
 
-vector<map<Element *, variant<State *, Rule *>>> parseTable;
-
 void buildStates() {
     State *s = newState();
     Terminal *t = terminal("$");
-    for (auto r : symbol(rules[1]->name)->rules)
+    for (auto r : symbol(rules[0]->name)->rules)
         s->add(r, t, 0, true);
     s->buildClosure();
 }
@@ -490,12 +486,8 @@ int parse(string const &inputname, string const &dir) {
         ss << file.rdbuf();
         std::string text = ss.str();
         cout << "read: " << text << endl << "======" << endl;
-        rules.push_back(new Rule());
         auto ptr = text.c_str();
         auto res = readGrammar(ptr);
-        rules[0]->name = "0";
-        rules[0]->elements.push_back(symbol(rules[1]->name));
-        rules[0]->elements.push_back(terminal("$"));
         if (res != nullptr) {
             for (auto e : rules)
                 e->print();
