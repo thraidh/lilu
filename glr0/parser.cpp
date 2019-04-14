@@ -477,6 +477,74 @@ void buildStates() {
     s->buildClosure();
 }
 
+void writeOutput(string const &cname, string const &dir) {
+    ofstream file;
+    string fname = dir + "/" + cname + ".gen.h";
+    file.open(fname.c_str());
+    if (file.is_open()) {
+        cout << "opened " << fname << endl;
+    } else {
+        cout << "could not open " << fname << " " << endl;
+        return;
+    }
+    file << "enum TokenId {" << endl << "    _NULL=0," << endl;
+    for (auto [k, v] : symbols)
+        file << "    s_" << v->name << "=" << v->index << "," << endl;
+    for (auto [k, v] : terminals) {
+        string_view n = v->name;
+        string_view raw = n;
+        string s;
+        char const *prefix;
+        if (n == "$") {
+            n = "EOF";
+            prefix = "_";
+        } else if (n[0] == '\'') {
+            prefix = "k_";
+            s = to_string(v->index);
+            n = s;
+        } else {
+            prefix = "t_";
+        }
+        file << "    " << prefix << n << "=" << v->index << ", // " << raw
+             << endl;
+    }
+    file << "};" << endl;
+    file.close();
+
+    fname = dir + "/" + cname + ".gen.cpp";
+    file.open(fname.c_str());
+    if (file.is_open()) {
+        cout << "opened " << fname << endl;
+    } else {
+        cout << "could not open " << fname << " " << endl;
+        return;
+    }
+
+    file << "#include \"glr_parser_base.h\"" << endl;
+    file << "#include \"" << cname << ".gen.h\"" << endl << endl;
+    file << "something parseTable = {" << endl;
+    for (State *s : states) {
+        file << "{";
+        for (auto [k, v] : s->parseTable) {
+            if (v.index() == 0)
+                continue;
+            file << "trans(" << k->index << ",";
+            if (auto statePtr = get_if<State *>(&v)) {
+                State *s = *statePtr;
+                file << s->index;
+            } else if (auto rulePtr = get_if<Rule *>(&v)) {
+                Rule *r = *rulePtr;
+                file << -(r->index + 1);
+            } else
+                file << 0;
+            file << "),";
+        }
+        file << "}," << endl;
+    }
+    file << "};" << endl;
+    file.close();
+}
+
 int parse(string const &inputname, string const &dir) {
 
     std::ifstream file(inputname);
@@ -516,6 +584,8 @@ int parse(string const &inputname, string const &dir) {
             } while (iter != end || pstate.size() > 0);
             cout << nodes.size() << endl;
             nodes[0]->print(0);
+            cout << "======" << endl;
+            writeOutput("out", dir);
         }
         cout << "======" << endl;
         std::cout << "rest: [[[" << res << "]]]" << std::endl;
