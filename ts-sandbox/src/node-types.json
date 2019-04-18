@@ -1,0 +1,76 @@
+[
+  {
+    "type": "arg",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "binop",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "exprstmt",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "funcdef",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "isblock",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "source_file",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "function",
+    "named": false
+  },
+  {
+    "type": "(",
+    "named": false
+  },
+  {
+    "type": ",",
+    "named": false
+  },
+  {
+    "type": ")",
+    "named": false
+  },
+  {
+    "type": ":",
+    "named": false
+  },
+  {
+    "type": "is",
+    "named": false
+  },
+  {
+    "type": "end",
+    "named": false
+  },
+  {
+    "type": "+",
+    "named": false
+  },
+  {
+    "type": "*",
+    "named": false
+  },
+  {
+    "type": "ID",
+    "named": true
+  },
+  {
+    "type": "NUMBER",
+    "named": true
+  }
+]

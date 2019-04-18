@@ -1,0 +1,4 @@
+function test(a:int, b:int):int is
+    a+b*c
+    a*b+c
+end
