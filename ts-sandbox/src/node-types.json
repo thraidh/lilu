@@ -10,6 +10,21 @@
     "fields": {}
   },
   {
+    "type": "elseblock",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "elseifblock",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "expr",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "exprstmt",
     "named": true,
     "fields": {}
@@ -20,12 +35,22 @@
     "fields": {}
   },
   {
+    "type": "ifstmt",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "isblock",
     "named": true,
     "fields": {}
   },
   {
     "type": "source_file",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "thenblock",
     "named": true,
     "fields": {}
   },
@@ -58,11 +83,55 @@
     "named": false
   },
   {
+    "type": "if",
+    "named": false
+  },
+  {
+    "type": "then",
+    "named": false
+  },
+  {
+    "type": "else",
+    "named": false
+  },
+  {
+    "type": ":=",
+    "named": false
+  },
+  {
+    "type": "or",
+    "named": false
+  },
+  {
+    "type": "and",
+    "named": false
+  },
+  {
+    "type": "=",
+    "named": false
+  },
+  {
+    "type": "!=",
+    "named": false
+  },
+  {
     "type": "+",
     "named": false
   },
   {
+    "type": "-",
+    "named": false
+  },
+  {
     "type": "*",
+    "named": false
+  },
+  {
+    "type": "/",
+    "named": false
+  },
+  {
+    "type": "%",
     "named": false
   },
   {

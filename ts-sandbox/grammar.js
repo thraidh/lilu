@@ -13,7 +13,8 @@ module.exports = grammar({
 
         _element: $ => choice(
             $.funcdef,
-            $.exprstmt
+            $.exprstmt,
+            $.ifstmt
         ),
 
         funcdef: $ => seq(
@@ -35,11 +36,38 @@ module.exports = grammar({
 
         exprstmt: $ => $._expr,
 
+        ifstmt: $ => seq(
+            'if',
+            $._expr,
+            $.thenblock,
+            repeat($.elseifblock),
+            optional($.elseblock),
+            'end'
+        ),
+        thenblock: $ => seq(
+            'then',
+            repeat($._element),
+        ),
+        elseifblock: $ => prec(1,seq(
+            'else',
+            'if',
+            $._expr,
+            'then',
+            repeat($._element),
+        )),
+        elseblock: $ => seq(
+            'else',
+            repeat($._element),
+        ),
+
         arg: $ => seq(alias($.ID, 'name'), ':', alias($.ID, 'type')),
+
+        expr: $ => $._expr,
 
         _expr: $ => choice(
             $.binop,
             $.ID,
+            $.NUMBER,
         ),
 
         binop: $ => choice(
