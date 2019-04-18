@@ -1,3 +1,10 @@
+const PREC_ASSIGN = 1
+const PREC_OR = 2
+const PREC_AND = 3
+const PREC_EQ = 5
+const PREC_PLUS = 10
+const PREC_MUL = 11
+
 module.exports = grammar({
     name: 'lilu',
     word: $ => $.ID,
@@ -30,14 +37,22 @@ module.exports = grammar({
 
         arg: $ => seq(alias($.ID, 'name'), ':', alias($.ID, 'type')),
 
-        _expr: $ =>choice(
+        _expr: $ => choice(
             $.binop,
             $.ID,
         ),
 
-        binop:$=>choice(
-            prec.left(1, seq($._expr, '+', $._expr)),
-            prec.left(2, seq($._expr, '*', $._expr))
+        binop: $ => choice(
+            prec.right(PREC_ASSIGN, seq($._expr, ':=', $._expr)),
+            prec.left(PREC_OR, seq($._expr, 'or', $._expr)),
+            prec.left(PREC_AND, seq($._expr, 'and', $._expr)),
+            prec.left(PREC_EQ, seq($._expr, '=', $._expr)),
+            prec.left(PREC_EQ, seq($._expr, '!=', $._expr)),
+            prec.left(PREC_PLUS, seq($._expr, '+', $._expr)),
+            prec.left(PREC_PLUS, seq($._expr, '-', $._expr)),
+            prec.left(PREC_MUL, seq($._expr, '*', $._expr)),
+            prec.left(PREC_MUL, seq($._expr, '/', $._expr)),
+            prec.left(PREC_MUL, seq($._expr, '%', $._expr)),
         ),
 
         ID: $ => /[a-zA-Z_][a-zA-Z_0-9]*/,
